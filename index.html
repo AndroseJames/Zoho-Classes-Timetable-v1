@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LMS Timetable Manager</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body style="margin:0;padding:0">
+<div id="root"></div>
+<script type="text/babel">
+
+const CSS = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F0EEE8}
+.app{display:flex;min-height:100vh}
+.sidebar{width:236px;background:#1E3A5F;color:white;flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+.main{margin-left:236px;flex:1;padding:1.75rem;min-height:100vh;background:#F0EEE8}
+.sb-brand{padding:1.1rem 1.15rem;border-bottom:1px solid rgba(255,255,255,0.1)}
+.sb-title{font-size:0.9rem;font-weight:700}
+.sb-sub{font-size:0.65rem;color:rgba(255,255,255,0.42);text-transform:uppercase;letter-spacing:0.06em;margin-top:0.15rem}
+.nav-sec{padding:0.45rem 1.15rem 0.15rem;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.35);font-weight:600;margin-top:0.3rem}
+.nav-item{display:flex;align-items:center;gap:0.6rem;padding:0.55rem 1.15rem;color:rgba(255,255,255,0.65);cursor:pointer;font-size:0.82rem;transition:all 0.15s;border-left:3px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,0.08);color:white}
+.nav-item.active{background:rgba(255,255,255,0.12);color:white;border-left-color:#D97706;font-weight:600}
+.card{background:white;border-radius:14px;border:1px solid #E8E2D6;padding:1.4rem}
+.stat-card{background:white;border-radius:14px;border:1px solid #E8E2D6;padding:1.15rem 1.4rem}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.9rem;margin-bottom:1.4rem}
+.tt-grid{border-radius:12px;overflow:hidden;border:1px solid #E2E0DA;background:white}
+.tt-hdr{background:#1E3A5F;color:white;padding:0.65rem 0.5rem;font-size:0.73rem;font-weight:600;text-align:center}
+.tt-hdr-left{text-align:left;padding-left:0.7rem}
+.tt-time{background:#F8F6F0;padding:0.35rem 0.55rem;font-size:0.66rem;color:#6B7080;text-align:right;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid #EDE9E0}
+.tt-cell{border-bottom:1px solid #EDE9E0;border-left:1px solid #EDE9E0;padding:0.32rem;min-height:74px;cursor:pointer;position:relative;transition:background 0.1s}
+.tt-cell:hover{background:#F8F6F0}
+.tt-coffee{background:#FFFDF5;border-bottom:1px solid #EDE9E0;padding:0.32rem 0.75rem;display:flex;align-items:center;font-size:0.71rem;color:#92600A;font-weight:600;min-height:34px;border-top:1px solid #F5EDCC}
+.tt-meal{background:#FFF7F0;border-bottom:1px solid #EDE9E0;padding:0.42rem 0.75rem;display:flex;align-items:center;font-size:0.71rem;color:#9A4A12;font-weight:600;min-height:44px;border-top:1px solid #F5DEC8}
+.tt-coffee-cell{background:#FFFDF5;border-left:1px solid #EDE9E0;border-bottom:1px solid #EDE9E0;display:flex;align-items:center;justify-content:center;border-top:1px solid #F5EDCC}
+.tt-meal-cell{background:#FFF7F0;border-left:1px solid #EDE9E0;border-bottom:1px solid #EDE9E0;display:flex;align-items:center;justify-content:center;border-top:1px solid #F5DEC8}
+.subj-card{border-radius:7px;padding:0.38rem 0.5rem;height:100%;min-height:62px;display:flex;flex-direction:column;justify-content:space-between;border-left:3px solid;cursor:grab;user-select:none}
+.subj-card:active{cursor:grabbing}
+.subj-name{font-size:0.74rem;font-weight:700;line-height:1.2}
+.subj-fac{font-size:0.65rem;opacity:0.78;margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drag-over{background:#E8F4FF!important;outline:2px dashed #2563EB;outline-offset:-2px}
+.dragging{opacity:0.35}
+.btn{display:inline-flex;align-items:center;gap:0.32rem;padding:0.48rem 0.85rem;border-radius:8px;font-size:0.81rem;font-weight:600;border:none;cursor:pointer;transition:all 0.15s;line-height:1}
+.btn-primary{background:#1E3A5F;color:white}.btn-primary:hover{background:#16304F}
+.btn-amber{background:#D97706;color:white}.btn-amber:hover{background:#B45309}
+.btn-green{background:#16A34A;color:white}.btn-green:hover{background:#15803D}
+.btn-red{background:#DC2626;color:white}.btn-red:hover{background:#B91C1C}
+.btn-outline{background:white;color:#1E3A5F;border:1.5px solid #D0C8BA}.btn-outline:hover{background:#F5F3EE}
+.btn-sm{padding:0.33rem 0.68rem;font-size:0.77rem}
+.btn-xs{padding:0.2rem 0.48rem;font-size:0.71rem}
+.badge{display:inline-flex;align-items:center;padding:0.17rem 0.52rem;border-radius:20px;font-size:0.68rem;font-weight:600}
+.bdg-green{background:#DCFCE7;color:#15803D}
+.bdg-amber{background:#FEF3C7;color:#B45309}
+.bdg-blue{background:#DBEAFE;color:#1D4ED8}
+.bdg-gray{background:#F3F4F6;color:#6B7280}
+.bdg-red{background:#FEE2E2;color:#B91C1C}
+.bdg-orange{background:#FEF0E7;color:#9A4A12}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.48);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal{background:white;border-radius:16px;max-width:500px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.22)}
+.modal-lg{max-width:720px}
+.modal-xl{max-width:860px}
+.modal-hdr{padding:1.3rem 1.3rem 0;display:flex;align-items:flex-start;justify-content:space-between}
+.modal-body{padding:1rem 1.3rem}
+.modal-foot{padding:0.85rem 1.3rem;border-top:1px solid #EDE9E0;display:flex;gap:0.55rem;justify-content:flex-end;align-items:center}
+.toast-wrap{position:fixed;bottom:1.4rem;right:1.4rem;z-index:9999;display:flex;flex-direction:column;gap:0.45rem}
+.toast{display:flex;align-items:center;gap:0.65rem;padding:0.65rem 0.95rem;border-radius:10px;font-size:0.81rem;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,0.14);animation:slIn 0.3s ease;min-width:240px;max-width:360px}
+.t-success{background:#1E3A5F;color:white}
+.t-error{background:#DC2626;color:white}
+.t-warning{background:#D97706;color:white}
+@keyframes slIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.save-dot{width:7px;height:7px;border-radius:50%;background:#D97706;display:inline-block;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.fg{display:flex;flex-direction:column;gap:0.28rem;margin-bottom:0.85rem}
+.lbl{font-size:0.75rem;font-weight:600;color:#374151}
+.inp{width:100%;padding:0.5rem 0.75rem;border:1.5px solid #D1C9BC;border-radius:8px;font-size:0.83rem;color:#1C1E2E;background:white;outline:none}
+.inp:focus{border-color:#1E3A5F;box-shadow:0 0 0 3px rgba(30,58,95,0.1)}
+.sel{width:100%;padding:0.5rem 0.75rem;border:1.5px solid #D1C9BC;border-radius:8px;font-size:0.83rem;color:#1C1E2E;background:white;outline:none;cursor:pointer}
+.sel:focus{border-color:#1E3A5F}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0.65rem}
+.steps{display:flex;align-items:center;margin-bottom:1.4rem}
+.st-num{width:25px;height:25px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0}
+.st-active{background:#1E3A5F;color:white}
+.st-done{background:#16A34A;color:white}
+.st-up{background:#E5E0D8;color:#9B9690}
+.st-line{flex:1;height:2px;background:#E5E0D8;margin:0 0.35rem}
+.st-line-done{background:#16A34A}
+.st-lbl{font-size:0.7rem;font-weight:600;margin-left:0.28rem}
+.freq-p{background:white;border-radius:14px;border:1px solid #E8E2D6;padding:1rem}
+.freq-bar-bg{height:5px;background:#EDE9E0;border-radius:3px;margin-top:0.25rem}
+.freq-bar{height:5px;border-radius:3px;transition:width 0.4s}
+.val-row{display:flex;align-items:flex-start;gap:0.42rem;padding:0.42rem 0;border-bottom:1px solid #F0EEE8;font-size:0.78rem}
+.val-row:last-child{border-bottom:none}
+.today-row{display:flex;align-items:flex-start;gap:0.6rem;padding:0.55rem 0;border-bottom:1px solid #F0EEE8}
+.today-row:last-child{border-bottom:none}
+.today-time{font-size:0.66rem;color:#6B7080;white-space:nowrap;min-width:75px;padding-top:0.08rem}
+.today-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:0.28rem}
+.dtbl{width:100%;border-collapse:collapse;font-size:0.81rem}
+.dtbl th{padding:0.6rem 0.9rem;text-align:left;font-size:0.7rem;font-weight:600;color:#6B7080;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #EDE9E0;background:#F8F6F0}
+.dtbl td{padding:0.75rem 0.9rem;border-bottom:1px solid #F0EEE8;vertical-align:middle}
+.dtbl tr:hover td{background:#FAFAF8}
+.day-chip{display:flex;align-items:center;gap:0.4rem;padding:0.42rem 0.68rem;border-radius:8px;border:1.5px solid #D1C9BC;cursor:pointer;font-size:0.81rem;font-weight:500;transition:all 0.15s;user-select:none}
+.day-on{background:#1E3A5F;color:white;border-color:#1E3A5F}
+.conflict-box{background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;padding:0.55rem 0.7rem;font-size:0.77rem;color:#B91C1C;margin-bottom:0.65rem}
+.warn-box{background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:0.5rem 0.68rem;font-size:0.77rem;color:#B45309;margin-bottom:0.6rem}
+.info-box{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:0.48rem 0.68rem;font-size:0.77rem;color:#1D4ED8;margin-bottom:0.6rem}
+.fac-row{display:flex;align-items:center;gap:0.65rem;padding:0.6rem 0;border-bottom:1px solid #F0EEE8}
+.fac-row:last-child{border-bottom:none}
+.fac-avatar{width:34px;height:34px;border-radius:50%;background:#1E3A5F;color:white;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0}
+.divider{height:1px;background:#EDE9E0;margin:0.75rem 0}
+`;
+
+const uid=()=>'x'+Math.random().toString(36).substr(2,9);
+const DAYS_ALL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const fmtT=t=>{if(!t)return'';const[h,m]=t.split(':').map(Number);const ap=h>=12?'PM':'AM';const hr=h>12?h-12:h===0?12:h;return`${hr}:${m.toString().padStart(2,'0')} ${ap}`;};
+const getDOW=()=>['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+const todayStr=()=>new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+const getEntry=(tt,day,pid)=>tt.entries.find(e=>e.day===day&&e.periodId===pid);
+const getSubj=(tt,id)=>tt.subjects.find(s=>s.id===id);
+const getFac=(tt,id)=>tt.faculty.find(f=>f.id===id);
+const cntSubj=(tt,sid)=>tt.entries.filter(e=>e.subjectId===sid).length;
+const isBreak=t=>t==='coffee-break'||t==='meal-break'||t==='break';
+const getInitials=name=>{if(!name)return'?';const p=name.replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)\s*/i,'').split(' ');return(p[0]?.[0]||'')+(p[1]?.[0]||'');};
+
+// Cross-timetable faculty conflict checker
+const checkCrossConflict=(allTTs,currentTT,facultyId,day,period)=>{
+  const fac=getFac(currentTT,facultyId);
+  if(!fac||!period||!allTTs)return[];
+  const hits=[];
+  allTTs.forEach(t=>{
+    if(t.id===currentTT.id)return;
+    t.entries.forEach(e=>{
+      if(e.day!==day)return;
+      const tFac=getFac(t,e.facultyId);
+      if(!tFac||tFac.name!==fac.name)return;
+      const tPer=t.periods.find(p=>p.id===e.periodId);
+      if(!tPer||isBreak(tPer.type))return;
+      if(period.startTime<tPer.endTime&&tPer.startTime<period.endTime){
+        hits.push({ttName:t.name,section:t.section||t.classYear||'',period:tPer});
+      }
+    });
+  });
+  return hits;
+};
+
+const validate=(tt,allTTs=[])=>{
+  const issues=[],warnings=[];
+  tt.subjects.forEach(s=>{
+    const c=cntSubj(tt,s.id);
+    if(c<s.periodsPerWeek)warnings.push(`${s.name}: ${c}/${s.periodsPerWeek} assigned — needs ${s.periodsPerWeek-c} more`);
+    else if(c>s.periodsPerWeek)issues.push(`${s.name}: ${c}/${s.periodsPerWeek} — over-assigned by ${c-s.periodsPerWeek}`);
+  });
+  // Same-timetable faculty double-booking check
+  const fm={};
+  tt.entries.forEach(e=>{
+    const k=`${e.facultyId}_${e.day}_${e.periodId}`;
+    if(fm[k]){const f=getFac(tt,e.facultyId);issues.push(`Faculty conflict (same timetable): ${f?.name||'Unknown'} double-booked on ${e.day}`);}
+    fm[k]=true;
+  });
+  // Cross-timetable faculty conflict check
+  tt.entries.forEach(e=>{
+    const period=tt.periods.find(p=>p.id===e.periodId);
+    if(!period||isBreak(period.type))return;
+    const cx=checkCrossConflict(allTTs,tt,e.facultyId,e.day,period);
+    if(cx.length>0){
+      const f=getFac(tt,e.facultyId);
+      cx.forEach(c=>issues.push(`Cross-timetable conflict: ${f?.name} is also assigned in "${c.ttName}" (${c.section}) on ${e.day} at ${fmtT(c.period.startTime)}`));
+    }
+  });
+  return{issues,warnings};
+};
+
+const autoGen=tt=>{
+  const cps=tt.periods.filter(p=>!isBreak(p.type));
+  const reqs=[];
+  tt.subjects.forEach(s=>{for(let i=0;i<s.periodsPerWeek;i++)reqs.push({sid:s.id,fid:s.facultyId||''});});
+  const slots=[];
+  tt.workingDays.forEach(d=>cps.forEach(p=>slots.push({day:d,periodId:p.id})));
+  for(let i=slots.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[slots[i],slots[j]]=[slots[j],slots[i]];}
+  const entries=[],used=new Set(),fu={};
+  let ri=0;
+  for(const sl of slots){
+    if(ri>=reqs.length)break;
+    const req=reqs[ri];
+    const sk=`${sl.day}_${sl.periodId}`,fk=`${req.fid}_${sl.day}_${sl.periodId}`;
+    if(!used.has(sk)&&!fu[fk]){
+      used.add(sk);if(req.fid)fu[fk]=true;
+      entries.push({id:uid(),day:sl.day,periodId:sl.periodId,subjectId:req.sid,facultyId:req.fid});ri++;
+    }
+  }
+  return{...tt,entries};
+};
+
+const SAMPLE={
+  id:'tt_001',name:'B.Sc CS — Semester 3 — Section A',academicYear:'2026-2027',
+  institution:'',department:'',
+  program:'B.Sc Computer Science',classYear:'Semester 3',section:'Section A',
+  status:'published',startDate:'2026-06-01',endDate:'2026-09-30',
+  createdAt:'2026-06-01',updatedAt:'2026-08-12',
+  workingDays:['Monday','Tuesday','Wednesday','Thursday','Friday'],
+  periods:[
+    {id:'p1',name:'Period 1',startTime:'08:30',endTime:'09:30',type:'class'},
+    {id:'p2',name:'Period 2',startTime:'09:30',endTime:'10:30',type:'class'},
+    {id:'b1',name:'Coffee Break',startTime:'10:30',endTime:'10:45',type:'coffee-break'},
+    {id:'p3',name:'Period 3',startTime:'10:45',endTime:'11:45',type:'class'},
+    {id:'p4',name:'Period 4',startTime:'11:45',endTime:'12:45',type:'class'},
+    {id:'l1',name:'Lunch Break',startTime:'12:45',endTime:'13:30',type:'meal-break'},
+    {id:'p5',name:'Period 5',startTime:'13:30',endTime:'14:30',type:'class'},
+    {id:'p6',name:'Period 6',startTime:'14:30',endTime:'15:30',type:'class'},
+  ],
+  subjects:[
+    {id:'s1',name:'Mathematics',code:'MAT101',type:'Theory',periodsPerWeek:5,color:'#2563EB',bg:'#DBEAFE',facultyId:'f1'},
+    {id:'s2',name:'Physics',code:'PHY101',type:'Theory',periodsPerWeek:4,color:'#7C3AED',bg:'#EDE9FE',facultyId:'f2'},
+    {id:'s3',name:'Computer Science',code:'CS101',type:'Practical',periodsPerWeek:6,color:'#16A34A',bg:'#DCFCE7',facultyId:'f4'},
+    {id:'s4',name:'English',code:'ENG101',type:'Theory',periodsPerWeek:3,color:'#D97706',bg:'#FEF3C7',facultyId:'f3'},
+    {id:'s5',name:'Database Mgmt',code:'DBM201',type:'Lab',periodsPerWeek:4,color:'#DB2777',bg:'#FCE7F3',facultyId:'f4'},
+  ],
+  faculty:[
+    {id:'f1',name:'Dr. Arun Kumar',employeeId:'EMP001',department:'Mathematics',email:'arun@greenfield.edu',maxPerDay:4,maxPerWeek:18},
+    {id:'f2',name:'Dr. Priya Sharma',employeeId:'EMP002',department:'Physics',email:'priya@greenfield.edu',maxPerDay:4,maxPerWeek:18},
+    {id:'f3',name:'Prof. Rahul Menon',employeeId:'EMP003',department:'English',email:'rahul@greenfield.edu',maxPerDay:4,maxPerWeek:18},
+    {id:'f4',name:'Prof. Kiran Das',employeeId:'EMP004',department:'Computer Science',email:'kiran@greenfield.edu',maxPerDay:5,maxPerWeek:22},
+  ],
+  entries:[
+    {id:'e01',day:'Monday',periodId:'p1',subjectId:'s1',facultyId:'f1'},
+    {id:'e02',day:'Monday',periodId:'p2',subjectId:'s2',facultyId:'f2'},
+    {id:'e03',day:'Monday',periodId:'p3',subjectId:'s3',facultyId:'f4'},
+    {id:'e04',day:'Monday',periodId:'p4',subjectId:'s4',facultyId:'f3'},
+    {id:'e05',day:'Monday',periodId:'p5',subjectId:'s5',facultyId:'f4'},
+    {id:'e06',day:'Tuesday',periodId:'p1',subjectId:'s2',facultyId:'f2'},
+    {id:'e07',day:'Tuesday',periodId:'p2',subjectId:'s1',facultyId:'f1'},
+    {id:'e08',day:'Tuesday',periodId:'p3',subjectId:'s4',facultyId:'f3'},
+    {id:'e09',day:'Tuesday',periodId:'p4',subjectId:'s5',facultyId:'f4'},
+    {id:'e10',day:'Tuesday',periodId:'p5',subjectId:'s3',facultyId:'f4'},
+    {id:'e11',day:'Wednesday',periodId:'p1',subjectId:'s4',facultyId:'f3'},
+    {id:'e12',day:'Wednesday',periodId:'p2',subjectId:'s3',facultyId:'f4'},
+    {id:'e13',day:'Wednesday',periodId:'p3',subjectId:'s1',facultyId:'f1'},
+    {id:'e14',day:'Wednesday',periodId:'p4',subjectId:'s2',facultyId:'f2'},
+    {id:'e15',day:'Wednesday',periodId:'p5',subjectId:'s5',facultyId:'f4'},
+    {id:'e16',day:'Thursday',periodId:'p1',subjectId:'s1',facultyId:'f1'},
+    {id:'e17',day:'Thursday',periodId:'p2',subjectId:'s3',facultyId:'f4'},
+    {id:'e18',day:'Thursday',periodId:'p3',subjectId:'s2',facultyId:'f2'},
+    {id:'e19',day:'Thursday',periodId:'p4',subjectId:'s5',facultyId:'f4'},
+    {id:'e20',day:'Friday',periodId:'p1',subjectId:'s3',facultyId:'f4'},
+    {id:'e21',day:'Friday',periodId:'p2',subjectId:'s1',facultyId:'f1'},
+    {id:'e22',day:'Friday',periodId:'p3',subjectId:'s3',facultyId:'f4'},
+  ]
+};
+
+const Toast=({toasts})=>(
+  <div className="toast-wrap">
+    {toasts.map(t=>(
+      <div key={t.id} className={`toast t-${t.type}`}>
+        <span>{t.type==='success'?'✓':t.type==='error'?'✗':'⚠'}</span>
+        <span>{t.msg}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const Confirm=({title,msg,onConfirm,onCancel,confirmTxt='Confirm',danger=false})=>(
+  <div className="overlay" onClick={onCancel}>
+    <div className="modal" style={{maxWidth:370}} onClick={e=>e.stopPropagation()}>
+      <div className="modal-hdr"><h3 style={{fontSize:'0.95rem',fontWeight:700,color:'#1E3A5F'}}>{title}</h3></div>
+      <div className="modal-body"><p style={{fontSize:'0.83rem',color:'#6B7080',lineHeight:1.6}}>{msg}</p></div>
+      <div className="modal-foot">
+        <button className="btn btn-outline btn-sm" onClick={onCancel}>Cancel</button>
+        <button className={`btn btn-sm ${danger?'btn-red':'btn-primary'}`} onClick={onConfirm}>{confirmTxt}</button>
+      </div>
+    </div>
+  </div>
+);
+
+// Faculty Management Modal
+const FacultyModal=({tt,onChange,onClose,showToast})=>{
+  const empty={name:'',employeeId:'',department:'',email:'',maxPerDay:4,maxPerWeek:20};
+  const[form,setForm]=useState(empty);
+  const[editing,setEditing]=useState(null);
+  const[confirmDel,setConfirmDel]=useState(null);
+  const upd=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
+  const startEdit=f=>{setEditing(f.id);setForm({name:f.name,employeeId:f.employeeId||'',department:f.department||'',email:f.email||'',maxPerDay:f.maxPerDay||4,maxPerWeek:f.maxPerWeek||20});};
+  const cancelEdit=()=>{setEditing(null);setForm(empty);};
+  const save=()=>{
+    if(!form.name.trim()){showToast('error','Faculty name is required.');return;}
+    let updated;
+    if(editing){
+      updated={...tt,faculty:tt.faculty.map(f=>f.id===editing?{...f,...form}:f)};
+      setEditing(null);setForm(empty);showToast('success','Faculty updated.');
+    } else {
+      const newF={id:uid(),...form};
+      updated={...tt,faculty:[...tt.faculty,newF]};
+      setForm(empty);showToast('success',`${form.name} added.`);
+    }
+    onChange(updated);
+  };
+  const remove=fid=>{
+    const hasAsgn=tt.entries.some(e=>e.facultyId===fid);
+    if(hasAsgn){setConfirmDel(fid);return;}
+    onChange({...tt,faculty:tt.faculty.filter(f=>f.id!==fid)});
+    showToast('success','Faculty removed.');
+  };
+  const doRemove=fid=>{
+    const newEntries=tt.entries.filter(e=>e.facultyId!==fid);
+    onChange({...tt,faculty:tt.faculty.filter(f=>f.id!==fid),entries:newEntries});
+    setConfirmDel(null);showToast('success','Faculty and their assignments removed.');
+  };
+  const tiny={fontSize:'0.79rem',padding:'0.36rem 0.55rem'};
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal modal-xl" onClick={e=>e.stopPropagation()}>
+        <div className="modal-hdr">
+          <div>
+            <div style={{fontSize:'1rem',fontWeight:700,color:'#1E3A5F'}}>👥 Manage Faculty</div>
+            <div style={{fontSize:'0.73rem',color:'#6B7080',marginTop:'0.15rem'}}>{tt.name}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.2rem',cursor:'pointer',color:'#6B7080'}}>×</button>
+        </div>
+        <div className="modal-body" style={{maxHeight:'72vh',overflowY:'auto'}}>
+          {/* Add / Edit form */}
+          <div style={{background:'#F8F6F0',borderRadius:'12px',padding:'1rem',marginBottom:'1.1rem',border:'1px solid #E8E2D6'}}>
+            <div style={{fontWeight:700,fontSize:'0.83rem',color:'#1E3A5F',marginBottom:'0.75rem'}}>{editing?'✏️ Edit Faculty':'➕ Add Faculty'}</div>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 2fr',gap:'0.5rem',marginBottom:'0.5rem'}}>
+              <div className="fg" style={{marginBottom:0}}>
+                <label className="lbl">Full Name *</label>
+                <input className="inp" style={tiny} value={form.name} onChange={upd('name')} placeholder="e.g. Dr. Arun Kumar"/>
+              </div>
+              <div className="fg" style={{marginBottom:0}}>
+                <label className="lbl">Employee ID</label>
+                <input className="inp" style={tiny} value={form.employeeId} onChange={upd('employeeId')} placeholder="EMP001"/>
+              </div>
+              <div className="fg" style={{marginBottom:0}}>
+                <label className="lbl">Department</label>
+                <input className="inp" style={tiny} value={form.department} onChange={upd('department')} placeholder="Mathematics"/>
+              </div>
+              <div className="fg" style={{marginBottom:0}}>
+                <label className="lbl">Email</label>
+                <input type="email" className="inp" style={tiny} value={form.email} onChange={upd('email')} placeholder="name@college.edu"/>
+              </div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'0.5rem',marginBottom:'0.75rem'}}>
+              <div className="fg" style={{marginBottom:0}}>
+                <label className="lbl">Max Periods/Day</label>
+                <input type="number" className="inp" style={tiny} value={form.maxPerDay} min={1} max={10} onChange={e=>setForm(p=>({...p,maxPerDay:+e.target.value}))}/>
+              </div>
+              <div className="fg" style={{marginBottom:0}}>
+                <label className="lbl">Max Periods/Week</label>
+                <input type="number" className="inp" style={tiny} value={form.maxPerWeek} min={1} max={40} onChange={e=>setForm(p=>({...p,maxPerWeek:+e.target.value}))}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:'0.5rem'}}>
+              <button className="btn btn-primary btn-sm" onClick={save}>{editing?'💾 Save Changes':'➕ Add Faculty'}</button>
+              {editing&&<button className="btn btn-outline btn-sm" onClick={cancelEdit}>Cancel</button>}
+            </div>
+          </div>
+
+          {/* Faculty list */}
+          <div style={{fontWeight:700,fontSize:'0.83rem',color:'#1E3A5F',marginBottom:'0.6rem'}}>{tt.faculty.length} Faculty Member{tt.faculty.length!==1?'s':''}</div>
+          {tt.faculty.length===0
+            ?<div style={{textAlign:'center',padding:'1.5rem',color:'#9B9690',fontSize:'0.83rem'}}>No faculty added yet. Use the form above to add faculty members.</div>
+            :tt.faculty.map(f=>{
+              const periods=tt.entries.filter(e=>e.facultyId===f.id).length;
+              return(
+                <div key={f.id} className="fac-row">
+                  <div className="fac-avatar">{getInitials(f.name)}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:'0.85rem'}}>{f.name}</div>
+                    <div style={{fontSize:'0.71rem',color:'#6B7080',marginTop:'0.1rem'}}>
+                      {f.department&&<span>{f.department}</span>}
+                      {f.employeeId&&<span style={{marginLeft:'0.6rem',color:'#9B9690'}}>{f.employeeId}</span>}
+                      {f.email&&<span style={{marginLeft:'0.6rem'}}>{f.email}</span>}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                    <span className="badge bdg-blue">{periods} periods</span>
+                    <span style={{fontSize:'0.68rem',color:'#9B9690'}}>max {f.maxPerDay||'—'}/day</span>
+                    <button className="btn btn-outline btn-xs" onClick={()=>startEdit(f)}>Edit</button>
+                    <button className="btn btn-xs btn-red" onClick={()=>remove(f.id)}>Remove</button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-primary btn-sm" onClick={onClose}>Done</button>
+        </div>
+      </div>
+      {confirmDel&&<Confirm title="Remove Faculty?" msg="This faculty member has class assignments. Removing them will also clear those assignments from the timetable." onConfirm={()=>doRemove(confirmDel)} onCancel={()=>setConfirmDel(null)} confirmTxt="Remove" danger/>}
+    </div>
+  );
+};
+
+// Cell assign modal - with cross-timetable conflict detection
+const CellModal=({tt,day,period,entry,onAssign,onClear,onClose,allTimetables})=>{
+  const[ss,setSS]=useState(entry?.subjectId||'');
+  const[sf,setSF]=useState(entry?.facultyId||'');
+  const chgS=sid=>{setSS(sid);const s=tt.subjects.find(x=>x.id===sid);if(s?.facultyId)setSF(s.facultyId);};
+
+  // Real-time cross-timetable conflict check
+  const crossConflicts=sf?checkCrossConflict(allTimetables,tt,sf,day,period):[];
+  // Over-assignment check
+  const overAssigned=ss&&(()=>{
+    const s=tt.subjects.find(x=>x.id===ss);
+    const c=cntSubj(tt,ss);
+    const ov=entry?.subjectId===ss?c>s.periodsPerWeek:c>=s.periodsPerWeek;
+    return ov?{subj:s,count:c}:null;
+  })();
+
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-hdr">
+          <div>
+            <h3 style={{fontSize:'0.93rem',fontWeight:700,color:'#1E3A5F'}}>{entry?'Edit Assignment':'Assign Subject'}</h3>
+            <p style={{fontSize:'0.73rem',color:'#6B7080',marginTop:'0.18rem'}}>{day} · {fmtT(period.startTime)} – {fmtT(period.endTime)}</p>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.2rem',cursor:'pointer',color:'#6B7080'}}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="fg">
+            <label className="lbl">Subject</label>
+            <select className="sel" value={ss} onChange={e=>chgS(e.target.value)}>
+              <option value="">— Select subject —</option>
+              {tt.subjects.map(s=>{
+                const c=cntSubj(tt,s.id);
+                return<option key={s.id} value={s.id}>{s.name} ({c}/{s.periodsPerWeek} assigned)</option>;
+              })}
+            </select>
+          </div>
+          <div className="fg">
+            <label className="lbl">Faculty</label>
+            <select className="sel" value={sf} onChange={e=>setSF(e.target.value)}>
+              <option value="">— Select faculty —</option>
+              {tt.faculty.map(f=>{
+                const perWeek=tt.entries.filter(e=>e.facultyId===f.id).length;
+                return<option key={f.id} value={f.id}>{f.name}{f.department?` — ${f.department}`:''} ({perWeek} periods/wk)</option>;
+              })}
+            </select>
+          </div>
+          {/* Show selected faculty info */}
+          {sf&&(()=>{
+            const f=getFac(tt,sf);
+            if(!f)return null;
+            const periods=tt.entries.filter(e=>e.facultyId===sf).length;
+            return<div className="info-box">
+              <strong>{f.name}</strong>{f.department&&<span> · {f.department}</span>}
+              {f.email&&<span style={{marginLeft:'0.5rem',opacity:0.8}}>{f.email}</span>}
+              <div style={{marginTop:'0.3rem',fontSize:'0.73rem'}}>{periods} periods/week{f.maxPerWeek?` · max ${f.maxPerWeek}/week`:''}{f.maxPerDay?` · max ${f.maxPerDay}/day`:''}</div>
+            </div>;
+          })()}
+          {/* Cross-timetable conflict warning */}
+          {crossConflicts.length>0&&(
+            <div className="conflict-box">
+              <div style={{fontWeight:700,marginBottom:'0.3rem'}}>⚠ Faculty Conflict Detected</div>
+              {crossConflicts.map((c,i)=>(
+                <div key={i} style={{marginTop:'0.2rem'}}>• {getFac(tt,sf)?.name} is already assigned in <strong>"{c.ttName}"</strong>{c.section&&` (${c.section})`} on {day} at {fmtT(c.period.startTime)}–{fmtT(c.period.endTime)}</div>
+              ))}
+            </div>
+          )}
+          {/* Over-assignment warning */}
+          {overAssigned&&(
+            <div className="warn-box">⚠ {overAssigned.subj.name} already has {overAssigned.count}/{overAssigned.subj.periodsPerWeek} periods. Adding more exceeds the weekly limit.</div>
+          )}
+          {tt.faculty.length===0&&(
+            <div className="warn-box">⚠ No faculty added yet. Close this and click <strong>👥 Faculty</strong> in the toolbar to add faculty members first.</div>
+          )}
+        </div>
+        <div className="modal-foot">
+          {entry&&<button className="btn btn-outline btn-sm" style={{marginRight:'auto',color:'#DC2626',borderColor:'#DC2626'}} onClick={onClear}>Clear Period</button>}
+          <button className="btn btn-outline btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" onClick={()=>onAssign(ss,sf)} disabled={!ss||!sf} style={{opacity:(!ss||!sf)?0.5:1}}>
+            {crossConflicts.length>0?'⚠ Assign Anyway':'Assign'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BreakRow=({period,days})=>{
+  const isMeal=period.type==='meal-break';
+  const icon=isMeal?'🍽':'☕';
+  const label=isMeal?'Meal Break':'Coffee Break';
+  const rowCls=isMeal?'tt-meal':'tt-coffee';
+  const cellCls=isMeal?'tt-meal-cell':'tt-coffee-cell';
+  return(
+    <React.Fragment>
+      <div className={rowCls}>
+        <span style={{marginRight:'0.45rem',fontSize:'0.95rem'}}>{icon}</span>
+        <span>{period.name}</span>
+        <span style={{marginLeft:'0.5rem',opacity:0.65}}>{fmtT(period.startTime)} – {fmtT(period.endTime)}</span>
+        <span className={`badge ${isMeal?'bdg-orange':'bdg-amber'}`} style={{marginLeft:'0.5rem',fontSize:'0.6rem'}}>{label}</span>
+      </div>
+      {days.map(d=>(
+        <div key={d} className={cellCls}>
+          <span style={{fontSize:'0.62rem',color:isMeal?'#C8905A':'#B0A070'}}>—</span>
+        </div>
+      ))}
+    </React.Fragment>
+  );
+};
+
+const TimetableGrid=({tt,editable,onChange,showToast,allTimetables})=>{
+  const[cellModal,setCellModal]=useState(null);
+  const[dragEntry,setDragEntry]=useState(null);
+  const[dragOver,setDragOver]=useState(null);
+  const days=tt.workingDays;
+  const cols=`116px repeat(${days.length},1fr)`;
+
+  const clickCell=(day,period)=>{
+    if(!editable||isBreak(period.type))return;
+    setCellModal({day,period,entry:getEntry(tt,day,period.id)});
+  };
+  const doAssign=(day,pid,sid,fid)=>{
+    if(!sid||!fid)return;
+    const ne=tt.entries.filter(e=>!(e.day===day&&e.periodId===pid));
+    ne.push({id:uid(),day,periodId:pid,subjectId:sid,facultyId:fid});
+    onChange({...tt,entries:ne});setCellModal(null);showToast('success','Subject assigned.');
+  };
+  const doClear=(day,pid)=>{onChange({...tt,entries:tt.entries.filter(e=>!(e.day===day&&e.periodId===pid))});setCellModal(null);showToast('success','Period cleared.');};
+  const dStart=(e,entry)=>{setDragEntry(entry);e.dataTransfer.effectAllowed='move';};
+  const dDrop=(e,day,pid,period)=>{
+    e.preventDefault();setDragOver(null);
+    if(!dragEntry||!editable)return;
+    const cx=checkCrossConflict(allTimetables,tt,dragEntry.facultyId,day,period);
+    if(cx.length>0){showToast('error',`⚠ Faculty conflict: ${getFac(tt,dragEntry.facultyId)?.name} is already assigned in another class at this time.`);return;}
+    const ne=tt.entries.filter(e=>e.id!==dragEntry.id&&!(e.day===day&&e.periodId===pid));
+    ne.push({...dragEntry,id:uid(),day,periodId:pid});
+    onChange({...tt,entries:ne});setDragEntry(null);showToast('success','Entry moved.');
+  };
+
+  return(
+    <>
+    <div className="tt-grid" style={{display:'grid',gridTemplateColumns:cols}}>
+      <div className="tt-hdr tt-hdr-left">Time</div>
+      {days.map(d=><div key={d} className="tt-hdr">{d}</div>)}
+      {tt.periods.map(period=>{
+        if(isBreak(period.type))return<BreakRow key={period.id} period={period} days={days}/>;
+        return(
+          <React.Fragment key={period.id}>
+            <div className="tt-time">
+              <span style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.68rem'}}>{period.name}</span>
+              <span>{fmtT(period.startTime)}</span>
+              <span>{fmtT(period.endTime)}</span>
+            </div>
+            {days.map(d=>{
+              const entry=getEntry(tt,d,period.id);
+              const s=entry?getSubj(tt,entry.subjectId):null;
+              const f=entry?getFac(tt,entry.facultyId):null;
+              const ck=`${d}_${period.id}`;
+              return(
+                <div key={d}
+                  className={`tt-cell${dragOver===ck?' drag-over':''}`}
+                  onClick={()=>clickCell(d,period)}
+                  onDragOver={e=>{e.preventDefault();setDragOver(ck);}}
+                  onDragLeave={()=>setDragOver(null)}
+                  onDrop={e=>dDrop(e,d,period.id,period)}
+                >
+                  {s?(
+                    <div
+                      className={`subj-card${dragEntry?.id===entry.id?' dragging':''}`}
+                      style={{background:s.bg||'#F3F4F6',borderLeftColor:s.color||'#6B7280'}}
+                      draggable={editable}
+                      onDragStart={e=>{e.stopPropagation();dStart(e,entry);}}
+                      onClick={e=>{e.stopPropagation();if(editable)clickCell(d,period);}}
+                    >
+                      <div className="subj-name" style={{color:s.color}}>{s.name}</div>
+                      {f&&<div className="subj-fac" title={f.name}>{f.name}</div>}
+                    </div>
+                  ):(
+                    editable&&<div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',color:'#CCC5BC',fontSize:'0.68rem'}}>+ Add</div>
+                  )}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        );
+      })}
+    </div>
+    {cellModal&&(
+      <CellModal tt={tt} day={cellModal.day} period={cellModal.period} entry={cellModal.entry}
+        allTimetables={allTimetables}
+        onAssign={(s,f)=>doAssign(cellModal.day,cellModal.period.id,s,f)}
+        onClear={()=>doClear(cellModal.day,cellModal.period.id)}
+        onClose={()=>setCellModal(null)}/>
+    )}
+    </>
+  );
+};
+
+const TodayPanel=({tt})=>{
+  const today=getDOW();
+  const isToday=tt.workingDays.includes(today);
+  const te=tt.entries.filter(e=>e.day===today);
+  return(
+    <div className="freq-p">
+      <div style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.83rem',marginBottom:'0.45rem'}}>Today's Classes</div>
+      <div style={{fontSize:'0.65rem',color:'#6B7080',marginBottom:'0.55rem'}}>{todayStr()}</div>
+      {!isToday?<p style={{fontSize:'0.75rem',color:'#9B9690'}}>No classes today.</p>:
+      te.length===0?<p style={{fontSize:'0.75rem',color:'#9B9690'}}>No classes scheduled.</p>:
+      tt.periods.map(p=>{
+        if(isBreak(p.type)){
+          const isMeal=p.type==='meal-break';
+          return<div key={p.id} className="today-row">
+            <span className="today-time">{fmtT(p.startTime)}</span>
+            <div className="today-dot" style={{background:isMeal?'#F97316':'#D97706'}}/>
+            <span style={{fontSize:'0.72rem',color:isMeal?'#9A4A12':'#92600A'}}>{isMeal?'🍽':'☕'} {p.name}</span>
+          </div>;
+        }
+        const e=te.find(en=>en.periodId===p.id);
+        if(!e)return null;
+        const s=getSubj(tt,e.subjectId);const f=getFac(tt,e.facultyId);
+        return<div key={p.id} className="today-row">
+          <span className="today-time">{fmtT(p.startTime)}</span>
+          <div className="today-dot" style={{background:s?.color||'#6B7280'}}/>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:'0.78rem',fontWeight:600}}>{s?.name}</div>
+            {f&&<div style={{fontSize:'0.65rem',color:'#6B7080',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>}
+          </div>
+        </div>;
+      })}
+    </div>
+  );
+};
+
+const FreqPanel=({tt})=>(
+  <div className="freq-p">
+    <div style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.83rem',marginBottom:'0.65rem'}}>Subject Requirements</div>
+    {tt.subjects.map(s=>{
+      const c=cntSubj(tt,s.id);
+      const pct=Math.min((c/s.periodsPerWeek)*100,100);
+      const over=c>s.periodsPerWeek,done=c===s.periodsPerWeek;
+      return<div key={s.id} style={{marginBottom:'0.62rem'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:'0.74rem',fontWeight:700,color:s.color}}>{s.name}</span>
+          <span style={{fontSize:'0.7rem',fontWeight:700,color:over?'#DC2626':done?'#16A34A':'#6B7080'}}>{c}/{s.periodsPerWeek}{done?' ✓':over?' ⚠':''}</span>
+        </div>
+        <div className="freq-bar-bg"><div className="freq-bar" style={{width:`${pct}%`,background:over?'#DC2626':done?'#16A34A':s.color}}/></div>
+      </div>;
+    })}
+  </div>
+);
+
+const Builder=({tt,onChange,onBack,showToast,allTimetables})=>{
+  const[showVal,setShowVal]=useState(false);
+  const[confPub,setConfPub]=useState(false);
+  const[confAuto,setConfAuto]=useState(false);
+  const[showFacMgr,setShowFacMgr]=useState(false);
+  const val=validate(tt,allTimetables);
+  const doPub=()=>{onChange({...tt,status:tt.status==='published'?'draft':'published'});setConfPub(false);showToast('success',tt.status==='published'?'Unpublished.':'Published!');};
+  const doAuto=()=>{onChange(autoGen(tt));setConfAuto(false);showToast('success','Auto-generated! Review and adjust.');};
+  const doSave=()=>{onChange({...tt,updatedAt:new Date().toISOString().split('T')[0]});showToast('success','Saved as draft.');};
+  const totalIssues=val.issues.length+val.warnings.length;
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'1rem'}}>
+        <div>
+          <button className="btn btn-outline btn-sm" style={{marginBottom:'0.5rem'}} onClick={onBack}>← Dashboard</button>
+          <div style={{fontSize:'1.3rem',fontWeight:700,color:'#1E3A5F',lineHeight:1.2}}>{tt.name}</div>
+          <div style={{fontSize:'0.79rem',color:'#6B7080',marginTop:'0.25rem'}}>{tt.institution} · {tt.department} · {tt.startDate} – {tt.endDate}</div>
+        </div>
+        <span className={`badge ${tt.status==='published'?'bdg-green':'bdg-amber'}`} style={{fontSize:'0.74rem',padding:'0.28rem 0.75rem',marginTop:'0.3rem'}}>{tt.status}</span>
+      </div>
+
+      <div className="card" style={{padding:'0.7rem 1rem',marginBottom:'0.9rem'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.5rem',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:'0.45rem',flexWrap:'wrap'}}>
+            <button className="btn btn-outline btn-sm" onClick={doSave}>💾 Save</button>
+            <button className="btn btn-sm" style={{background:showVal?'#1E3A5F':'white',color:showVal?'white':'#1E3A5F',border:'1.5px solid #D0C8BA'}} onClick={()=>setShowVal(!showVal)}>
+              {totalIssues>0?`⚠ ${totalIssues} Issue${totalIssues>1?'s':''}`:val.issues.length===0&&val.warnings.length===0?'✓ No Issues':'Validate'}
+            </button>
+            <button className="btn btn-outline btn-sm" onClick={()=>setConfAuto(true)}>⚡ Auto Generate</button>
+            <button className="btn btn-outline btn-sm" style={{background:'#EFF6FF',color:'#1D4ED8',borderColor:'#BFDBFE'}} onClick={()=>setShowFacMgr(true)}>👥 Faculty ({tt.faculty.length})</button>
+          </div>
+          <button className={`btn btn-sm ${tt.status==='published'?'btn-outline':'btn-green'}`} onClick={()=>setConfPub(true)}>
+            {tt.status==='published'?'⊘ Unpublish':'✓ Publish'}
+          </button>
+        </div>
+      </div>
+
+      {showVal&&(
+        <div className="card" style={{marginBottom:'0.9rem'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'0.65rem'}}>
+            <div style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.87rem'}}>Validation Results</div>
+            <button onClick={()=>setShowVal(false)} style={{background:'none',border:'none',cursor:'pointer',color:'#6B7080',fontSize:'1.1rem'}}>×</button>
+          </div>
+          {val.issues.length===0&&val.warnings.length===0
+            ?<div style={{color:'#16A34A',fontSize:'0.83rem'}}>✓ All checks passed — no conflicts detected.</div>
+            :<>
+              {val.issues.map((m,i)=><div key={i} className="val-row"><span style={{color:'#DC2626',fontWeight:700,flexShrink:0}}>✗</span><span>{m}</span></div>)}
+              {val.warnings.map((m,i)=><div key={i} className="val-row"><span style={{color:'#D97706',fontWeight:700,flexShrink:0}}>⚠</span><span>{m}</span></div>)}
+            </>}
+        </div>
+      )}
+
+      {tt.faculty.length===0&&(
+        <div className="warn-box" style={{marginBottom:'0.9rem'}}>
+          ⚠ No faculty added yet. Click <strong>👥 Faculty</strong> above to add faculty members before assigning classes.
+        </div>
+      )}
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 252px',gap:'1rem',alignItems:'start'}}>
+        <div>
+          <TimetableGrid tt={tt} editable={true} onChange={onChange} showToast={showToast} allTimetables={allTimetables}/>
+          <div style={{fontSize:'0.68rem',color:'#9B9690',marginTop:'0.45rem'}}>Click a cell to assign · Drag cards to rearrange · Faculty conflicts checked automatically</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'0.85rem'}}>
+          <FreqPanel tt={tt}/>
+          <TodayPanel tt={tt}/>
+          <div className="freq-p">
+            <div style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.83rem',marginBottom:'0.6rem'}}>Faculty Load</div>
+            {tt.faculty.length===0?<div style={{fontSize:'0.75rem',color:'#9B9690'}}>No faculty added.</div>:
+            tt.faculty.map(f=>{
+              const periods=tt.entries.filter(e=>e.facultyId===f.id).length;
+              const over=f.maxPerWeek&&periods>f.maxPerWeek;
+              return<div key={f.id} style={{padding:'0.3rem 0',borderBottom:'1px solid #F0EEE8'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.4rem',minWidth:0}}>
+                    <div className="fac-avatar" style={{width:22,height:22,fontSize:'0.6rem'}}>{getInitials(f.name)}</div>
+                    <span style={{fontSize:'0.76rem',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
+                  </div>
+                  <span className={`badge ${over?'bdg-red':'bdg-blue'}`} style={{flexShrink:0,marginLeft:'0.3rem'}}>{periods}{f.maxPerWeek?`/${f.maxPerWeek}`:''}</span>
+                </div>
+              </div>;
+            })}
+          </div>
+          {/* Breaks legend */}
+          <div className="freq-p">
+            <div style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.83rem',marginBottom:'0.6rem'}}>Breaks Schedule</div>
+            {tt.periods.filter(p=>isBreak(p.type)).length===0
+              ?<div style={{fontSize:'0.75rem',color:'#9B9690'}}>No breaks configured.</div>
+              :tt.periods.filter(p=>isBreak(p.type)).map(p=>(
+                <div key={p.id} style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.3rem 0',borderBottom:'1px solid #F0EEE8',fontSize:'0.76rem'}}>
+                  <span>{p.type==='meal-break'?'🍽':'☕'}</span>
+                  <span style={{fontWeight:600}}>{p.name}</span>
+                  <span style={{color:'#6B7080',marginLeft:'auto'}}>{fmtT(p.startTime)}–{fmtT(p.endTime)}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+
+      {showFacMgr&&<FacultyModal tt={tt} onChange={onChange} onClose={()=>setShowFacMgr(false)} showToast={showToast}/>}
+      {confPub&&<Confirm title={tt.status==='published'?'Unpublish?':'Publish Timetable?'}
+        msg={tt.status==='published'?'Students and faculty will no longer see this.':'Students and faculty can access this once published.'}
+        onConfirm={doPub} onCancel={()=>setConfPub(false)} confirmTxt={tt.status==='published'?'Unpublish':'Publish'}/>}
+      {confAuto&&<Confirm title="Auto-Generate Timetable?" msg="This replaces all current assignments. You can edit afterwards."
+        onConfirm={doAuto} onCancel={()=>setConfAuto(false)} confirmTxt="Generate"/>}
+    </div>
+  );
+};
+
+const StudentView=({tt,onBack})=>{
+  const today=getDOW();
+  return(
+    <div>
+      <button className="btn btn-outline btn-sm" style={{marginBottom:'1rem'}} onClick={onBack}>← Back</button>
+      <div style={{background:'#1E3A5F',borderRadius:'14px',padding:'1.3rem',color:'white',marginBottom:'1.1rem'}}>
+        <div style={{fontSize:'1.15rem',fontWeight:700}}>{tt.name}</div>
+        <div style={{fontSize:'0.8rem',opacity:0.68,marginTop:'0.28rem'}}>{tt.institution} · {tt.program}</div>
+        <div style={{fontSize:'0.73rem',opacity:0.5,marginTop:'0.18rem'}}>Valid: {tt.startDate} – {tt.endDate}</div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 240px',gap:'1rem',alignItems:'start'}}>
+        <div>
+          <TimetableGrid tt={tt} editable={false} onChange={()=>{}} showToast={()=>{}} allTimetables={[]}/>
+          <div style={{fontSize:'0.7rem',color:'#9B9690',marginTop:'0.4rem'}}>Today: {today}</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'0.85rem'}}>
+          <TodayPanel tt={tt}/>
+          <div className="freq-p">
+            <div style={{fontWeight:700,color:'#1E3A5F',fontSize:'0.83rem',marginBottom:'0.6rem'}}>Subjects & Faculty</div>
+            {tt.subjects.map(s=>{
+              const facId=s.facultyId;
+              const f=getFac(tt,facId);
+              return<div key={s.id} style={{padding:'0.35rem 0',borderBottom:'1px solid #F0EEE8'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'0.45rem',marginBottom:'0.1rem'}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:s.color,flexShrink:0}}/>
+                  <span style={{fontSize:'0.78rem',fontWeight:700,color:s.color}}>{s.name}</span>
+                  <span style={{fontSize:'0.65rem',color:'#9B9690',marginLeft:'auto'}}>{s.code}</span>
+                </div>
+                {f&&<div style={{fontSize:'0.68rem',color:'#6B7080',paddingLeft:'1.1rem'}}>{f.name}{f.department&&` · ${f.department}`}</div>}
+              </div>;
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FacultyView=({tt,onBack})=>{
+  const[selF,setSelF]=useState(tt.faculty[0]?.id||'');
+  const fac=getFac(tt,selF);
+  const fe=tt.entries.filter(e=>e.facultyId===selF);
+  const filtered={...tt,entries:fe};
+  return(
+    <div>
+      <button className="btn btn-outline btn-sm" style={{marginBottom:'1rem'}} onClick={onBack}>← Back</button>
+      <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+        <div style={{fontSize:'1.3rem',fontWeight:700,color:'#1E3A5F'}}>Faculty Schedule</div>
+        <select className="sel" style={{width:240}} value={selF} onChange={e=>setSelF(e.target.value)}>
+          <option value="">— Select faculty —</option>
+          {tt.faculty.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+      </div>
+      {fac&&<div className="card" style={{padding:'0.9rem 1.15rem',marginBottom:'1rem',display:'flex',alignItems:'center',gap:'0.85rem',flexWrap:'wrap'}}>
+        <div className="fac-avatar" style={{width:42,height:42,fontSize:'1rem'}}>{getInitials(fac.name)}</div>
+        <div>
+          <div style={{fontWeight:700,fontSize:'0.92rem'}}>{fac.name}</div>
+          <div style={{fontSize:'0.75rem',color:'#6B7080'}}>{fac.department&&<span>{fac.department}</span>}{fac.employeeId&&<span style={{marginLeft:'0.65rem'}}>{fac.employeeId}</span>}{fac.email&&<span style={{marginLeft:'0.65rem'}}>{fac.email}</span>}</div>
+        </div>
+        <div style={{marginLeft:'auto',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+          <span className="badge bdg-blue">{fe.length} periods/week</span>
+          {fac.maxPerWeek&&<span className="badge bdg-gray">max {fac.maxPerWeek}/week</span>}
+          {fac.maxPerDay&&<span className="badge bdg-gray">max {fac.maxPerDay}/day</span>}
+        </div>
+      </div>}
+      <TimetableGrid tt={filtered} editable={false} onChange={()=>{}} showToast={()=>{}} allTimetables={[]}/>
+    </div>
+  );
+};
+
+const WIZARD_STEPS=['Basic Info','Working Days','Periods & Breaks','Subjects','Faculty'];
+const COLORS=['#2563EB','#7C3AED','#16A34A','#D97706','#DB2777','#DC2626','#0891B2'];
+const BGS=['#DBEAFE','#EDE9FE','#DCFCE7','#FEF3C7','#FCE7F3','#FEE2E2','#CFFAFE'];
+
+const Wizard=({onSave,onClose,showToast})=>{
+  const[step,setStep]=useState(1);
+  const[info,setInfo]=useState({name:'',academicYear:'2026-2027',institution:'',department:'',program:'',classYear:'',section:'',status:'draft',startDate:'',endDate:''});
+  const[days,setDays]=useState(['Monday','Tuesday','Wednesday','Thursday','Friday']);
+  const[periods,setPeriods]=useState([
+    {id:uid(),name:'Period 1',startTime:'08:30',endTime:'09:30',type:'class'},
+    {id:uid(),name:'Coffee Break',startTime:'09:30',endTime:'09:45',type:'coffee-break'},
+    {id:uid(),name:'Period 2',startTime:'09:45',endTime:'10:45',type:'class'},
+    {id:uid(),name:'Period 3',startTime:'10:45',endTime:'11:45',type:'class'},
+    {id:uid(),name:'Lunch Break',startTime:'11:45',endTime:'12:30',type:'meal-break'},
+    {id:uid(),name:'Period 4',startTime:'12:30',endTime:'13:30',type:'class'},
+  ]);
+  const[subjects,setSubjects]=useState([{id:uid(),name:'',code:'',type:'Theory',periodsPerWeek:4,color:COLORS[0],bg:BGS[0],facultyId:''}]);
+  const[faculty,setFaculty]=useState([{id:uid(),name:'',employeeId:'',department:'',email:'',maxPerDay:4,maxPerWeek:20}]);
+  const togDay=d=>setDays(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
+  const addS=()=>{const i=subjects.length%COLORS.length;setSubjects(p=>[...p,{id:uid(),name:'',code:'',type:'Theory',periodsPerWeek:3,color:COLORS[i],bg:BGS[i],facultyId:''}]);};
+  const addF=()=>setFaculty(p=>[...p,{id:uid(),name:'',employeeId:'',department:'',email:'',maxPerDay:4,maxPerWeek:20}]);
+  const updP=(id,k,v)=>{
+    setPeriods(p=>p.map(x=>{
+      if(x.id!==id)return x;
+      let updated={...x,[k]:v};
+      // Auto-name breaks
+      if(k==='type'&&v==='meal-break'&&x.name.toLowerCase().includes('break')&&!x.name.toLowerCase().includes('lunch'))updated.name='Lunch Break';
+      if(k==='type'&&v==='coffee-break'&&(x.name.toLowerCase().includes('break')&&!x.name.toLowerCase().includes('coffee')))updated.name='Coffee Break';
+      if(k==='type'&&v==='class'&&(x.name.toLowerCase().includes('break')||x.name.toLowerCase().includes('lunch')))updated.name=`Period ${p.filter(q=>q.type==='class').length+1}`;
+      return updated;
+    }));
+  };
+  const updS=(id,k,v)=>setSubjects(p=>p.map(x=>x.id===id?{...x,[k]:v}:x));
+  const updF=(id,k,v)=>setFaculty(p=>p.map(x=>x.id===id?{...x,[k]:v}:x));
+  const doSave=()=>{
+    if(!info.name.trim()){showToast('error','Timetable name is required.');return;}
+    const facList=faculty.filter(f=>f.name.trim());
+    const subjList=subjects.filter(s=>s.name.trim());
+    onSave({id:uid(),...info,workingDays:days,periods,subjects:subjList,faculty:facList,entries:[],createdAt:new Date().toISOString().split('T')[0],updatedAt:new Date().toISOString().split('T')[0]});
+  };
+  const tiny={fontSize:'0.79rem',padding:'0.36rem 0.55rem'};
+  const typeLabel=t=>t==='class'?'Class Period':t==='coffee-break'?'☕ Coffee Break':t==='meal-break'?'🍽 Meal Break':'Break';
+  const typeColor=t=>t==='meal-break'?'#FFF7F0':t==='coffee-break'?'#FFFDF5':'white';
+  return(
+    <div className="overlay">
+      <div className="modal modal-lg" onClick={e=>e.stopPropagation()}>
+        <div className="modal-hdr">
+          <div>
+            <div style={{fontSize:'1rem',fontWeight:700,color:'#1E3A5F'}}>Create New Timetable</div>
+            <div style={{fontSize:'0.73rem',color:'#6B7080',marginTop:'0.15rem'}}>Step {step} of {WIZARD_STEPS.length}: {WIZARD_STEPS[step-1]}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.2rem',cursor:'pointer',color:'#6B7080'}}>×</button>
+        </div>
+        <div style={{padding:'0.9rem 1.3rem 0'}}>
+          <div className="steps">
+            {WIZARD_STEPS.map((l,i)=>(
+              <React.Fragment key={i}>
+                <div style={{display:'flex',alignItems:'center',gap:'0.28rem'}}>
+                  <div className={`st-num ${step>i+1?'st-done':step===i+1?'st-active':'st-up'}`}>{step>i+1?'✓':i+1}</div>
+                  <span className="st-lbl" style={{color:step>i+1?'#16A34A':step===i+1?'#1E3A5F':'#9B9690'}}>{l}</span>
+                </div>
+                {i<WIZARD_STEPS.length-1&&<div className={`st-line ${step>i+1?'st-line-done':''}`}/>}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+        <div className="modal-body" style={{maxHeight:'52vh',overflowY:'auto'}}>
+          {step===1&&(
+            <div className="g2">
+              {[['Timetable Name *','name','text','e.g. B.Sc CS Sem 3 — Section A'],['Academic Year','academicYear','text',''],['Institution','institution','text',''],['Department','department','text',''],['Program / Course','program','text','e.g. B.Sc Computer Science'],['Class / Semester','classYear','text','e.g. Semester 3'],['Section / Batch','section','text','e.g. Section A']].map(([l,k,t,ph])=>(
+                <div key={k} className="fg">
+                  <label className="lbl">{l}</label>
+                  <input type={t} className="inp" value={info[k]} onChange={e=>setInfo(p=>({...p,[k]:e.target.value}))} placeholder={ph}/>
+                </div>
+              ))}
+              <div className="fg"><label className="lbl">Status</label>
+                <select className="sel" value={info.status} onChange={e=>setInfo(p=>({...p,status:e.target.value}))}>
+                  <option value="draft">Draft</option><option value="published">Published</option>
+                </select>
+              </div>
+              <div className="fg"><label className="lbl">Start Date</label><input type="date" className="inp" value={info.startDate} onChange={e=>setInfo(p=>({...p,startDate:e.target.value}))}/></div>
+              <div className="fg"><label className="lbl">End Date</label><input type="date" className="inp" value={info.endDate} onChange={e=>setInfo(p=>({...p,endDate:e.target.value}))}/></div>
+            </div>
+          )}
+          {step===2&&(
+            <div>
+              <p style={{fontSize:'0.8rem',color:'#6B7080',marginBottom:'0.75rem'}}>Select the days your institution operates.</p>
+              <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'0.9rem'}}>
+                {DAYS_ALL.map(d=><div key={d} className={`day-chip${days.includes(d)?' day-on':''}`} onClick={()=>togDay(d)}>{d.slice(0,3)}</div>)}
+              </div>
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <button className="btn btn-outline btn-sm" onClick={()=>setDays(['Monday','Tuesday','Wednesday','Thursday','Friday'])}>Mon–Fri</button>
+                <button className="btn btn-outline btn-sm" onClick={()=>setDays(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'])}>Mon–Sat</button>
+                <button className="btn btn-outline btn-sm" onClick={()=>setDays([])}>Clear</button>
+              </div>
+            </div>
+          )}
+          {step===3&&(
+            <div>
+              <p style={{fontSize:'0.8rem',color:'#6B7080',marginBottom:'0.6rem'}}>Define class periods, coffee breaks, and meal breaks. Drag to reorder.</p>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:'0.35rem',marginBottom:'0.3rem'}}>
+                {['Name','Start','End','Type',''].map((h,i)=><span key={i} style={{fontSize:'0.66rem',color:'#9B9690',fontWeight:600}}>{h}</span>)}
+              </div>
+              {periods.map(p=>(
+                <div key={p.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:'0.35rem',alignItems:'center',marginBottom:'0.38rem',background:typeColor(p.type),borderRadius:'6px',padding:'0.25rem 0.3rem'}}>
+                  <input className="inp" style={{...tiny,background:'white'}} value={p.name} onChange={e=>updP(p.id,'name',e.target.value)} placeholder="Name"/>
+                  <input type="time" className="inp" style={{...tiny,background:'white'}} value={p.startTime} onChange={e=>updP(p.id,'startTime',e.target.value)}/>
+                  <input type="time" className="inp" style={{...tiny,background:'white'}} value={p.endTime} onChange={e=>updP(p.id,'endTime',e.target.value)}/>
+                  <select className="sel" style={{...tiny,background:'white'}} value={p.type} onChange={e=>updP(p.id,'type',e.target.value)}>
+                    <option value="class">Class Period</option>
+                    <option value="coffee-break">☕ Coffee Break</option>
+                    <option value="meal-break">🍽 Meal Break</option>
+                  </select>
+                  <button style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:'0.95rem'}} onClick={()=>setPeriods(x=>x.filter(q=>q.id!==p.id))}>✕</button>
+                </div>
+              ))}
+              <div style={{display:'flex',gap:'0.5rem',marginTop:'0.75rem',flexWrap:'wrap'}}>
+                <button className="btn btn-outline btn-sm" onClick={()=>setPeriods(p=>[...p,{id:uid(),name:`Period ${p.filter(x=>x.type==='class').length+1}`,startTime:'',endTime:'',type:'class'}])}>+ Class Period</button>
+                <button className="btn btn-sm" style={{background:'#FFFDF5',color:'#92600A',border:'1.5px solid #F5EDCC'}} onClick={()=>setPeriods(p=>[...p,{id:uid(),name:'Coffee Break',startTime:'',endTime:'',type:'coffee-break'}])}>☕ Coffee Break</button>
+                <button className="btn btn-sm" style={{background:'#FFF7F0',color:'#9A4A12',border:'1.5px solid #F5DEC8'}} onClick={()=>setPeriods(p=>[...p,{id:uid(),name:'Lunch Break',startTime:'',endTime:'',type:'meal-break'}])}>🍽 Meal Break</button>
+              </div>
+            </div>
+          )}
+          {step===4&&(
+            <div>
+              <p style={{fontSize:'0.8rem',color:'#6B7080',marginBottom:'0.6rem'}}>Add subjects and set weekly period requirements.</p>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:'0.35rem',marginBottom:'0.3rem'}}>
+                {['Subject Name','Code','Type','Periods/wk',''].map((h,i)=><span key={i} style={{fontSize:'0.66rem',color:'#9B9690',fontWeight:600}}>{h}</span>)}
+              </div>
+              {subjects.map(s=>(
+                <div key={s.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:'0.35rem',alignItems:'center',marginBottom:'0.35rem'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.35rem'}}>
+                    <div style={{width:9,height:9,borderRadius:'50%',background:s.color,flexShrink:0}}/>
+                    <input className="inp" style={tiny} value={s.name} onChange={e=>updS(s.id,'name',e.target.value)} placeholder="e.g. Mathematics"/>
+                  </div>
+                  <input className="inp" style={tiny} value={s.code} onChange={e=>updS(s.id,'code',e.target.value)} placeholder="MAT101"/>
+                  <select className="sel" style={tiny} value={s.type} onChange={e=>updS(s.id,'type',e.target.value)}>
+                    <option>Theory</option><option>Practical</option><option>Lab</option><option>Tutorial</option>
+                  </select>
+                  <input type="number" className="inp" style={tiny} value={s.periodsPerWeek} min={1} max={30} onChange={e=>updS(s.id,'periodsPerWeek',+e.target.value)}/>
+                  <button style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:'0.95rem'}} onClick={()=>setSubjects(x=>x.filter(q=>q.id!==s.id))}>✕</button>
+                </div>
+              ))}
+              <button className="btn btn-outline btn-sm" style={{marginTop:'0.65rem'}} onClick={addS}>+ Add Subject</button>
+            </div>
+          )}
+          {step===5&&(
+            <div>
+              <p style={{fontSize:'0.8rem',color:'#6B7080',marginBottom:'0.6rem'}}>Add faculty members. You can also add/edit faculty later from the timetable builder.</p>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 2fr 0.7fr 0.7fr auto',gap:'0.35rem',marginBottom:'0.3rem'}}>
+                {['Full Name','Emp ID','Dept','Email','Max/Day','Max/Wk',''].map((h,i)=><span key={i} style={{fontSize:'0.62rem',color:'#9B9690',fontWeight:600}}>{h}</span>)}
+              </div>
+              {faculty.map(f=>(
+                <div key={f.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 2fr 0.7fr 0.7fr auto',gap:'0.35rem',alignItems:'center',marginBottom:'0.35rem'}}>
+                  <input className="inp" style={tiny} value={f.name} onChange={e=>updF(f.id,'name',e.target.value)} placeholder="Dr. Full Name"/>
+                  <input className="inp" style={tiny} value={f.employeeId} onChange={e=>updF(f.id,'employeeId',e.target.value)} placeholder="EMP001"/>
+                  <input className="inp" style={tiny} value={f.department} onChange={e=>updF(f.id,'department',e.target.value)} placeholder="Dept"/>
+                  <input type="email" className="inp" style={tiny} value={f.email} onChange={e=>updF(f.id,'email',e.target.value)} placeholder="email@edu"/>
+                  <input type="number" className="inp" style={tiny} value={f.maxPerDay} min={1} max={10} onChange={e=>updF(f.id,'maxPerDay',+e.target.value)}/>
+                  <input type="number" className="inp" style={tiny} value={f.maxPerWeek} min={1} max={40} onChange={e=>updF(f.id,'maxPerWeek',+e.target.value)}/>
+                  <button style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:'0.95rem'}} onClick={()=>setFaculty(x=>x.filter(q=>q.id!==f.id))}>✕</button>
+                </div>
+              ))}
+              <button className="btn btn-outline btn-sm" style={{marginTop:'0.65rem'}} onClick={addF}>+ Add Faculty</button>
+            </div>
+          )}
+        </div>
+        <div className="modal-foot">
+          {step>1&&<button className="btn btn-outline btn-sm" onClick={()=>setStep(s=>s-1)}>← Back</button>}
+          <span style={{flex:1}}/>
+          <button className="btn btn-outline btn-sm" onClick={onClose}>Cancel</button>
+          {step<WIZARD_STEPS.length
+            ?<button className="btn btn-primary btn-sm" onClick={()=>setStep(s=>s+1)} style={{opacity:step===1&&!info.name?0.5:1}} disabled={step===1&&!info.name}>Next →</button>
+            :<button className="btn btn-green btn-sm" onClick={doSave}>✓ Create Timetable</button>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Dashboard=({timetables,onOpen,onCreate,onDelete,onDuplicate,showToast})=>{
+  const[confDel,setConfDel]=useState(null);
+  const pub=timetables.filter(t=>t.status==='published').length;
+  const drafts=timetables.filter(t=>t.status==='draft').length;
+  const conflicts=timetables.reduce((a,t)=>a+validate(t,timetables).issues.length,0);
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'1.2rem'}}>
+        <div>
+          <div style={{fontSize:'1.4rem',fontWeight:700,color:'#1E3A5F'}}>Timetable Dashboard</div>
+          <div style={{fontSize:'0.83rem',color:'#6B7080',marginTop:'0.25rem'}}>Academic Schedule Management</div>
+        </div>
+        <button className="btn btn-primary" onClick={onCreate}>+ Create Timetable</button>
+      </div>
+      <div className="stats-grid">
+        {[{l:'Total',v:timetables.length,c:'#1E3A5F'},{l:'Published',v:pub,c:'#16A34A'},{l:'Drafts',v:drafts,c:'#D97706'},{l:'Conflicts',v:conflicts,c:conflicts?'#DC2626':'#16A34A'}].map(s=>(
+          <div key={s.l} className="stat-card">
+            <div style={{fontSize:'2rem',fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:'0.73rem',color:'#6B7080',marginTop:'0.28rem'}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      {timetables.length===0?(
+        <div className="card" style={{textAlign:'center',padding:'4rem 2rem'}}>
+          <div style={{fontSize:'3rem',marginBottom:'0.9rem'}}>📅</div>
+          <div style={{fontSize:'1.05rem',fontWeight:700,color:'#1E3A5F',marginBottom:'0.45rem'}}>No timetables yet</div>
+          <div style={{fontSize:'0.83rem',color:'#6B7080',marginBottom:'1.2rem'}}>Create a timetable to organise classes, subjects, faculty, and periods.</div>
+          <button className="btn btn-primary" onClick={onCreate}>+ Create Timetable</button>
+        </div>
+      ):(
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'0.9rem 1.1rem',borderBottom:'1px solid #EDE9E0',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{fontSize:'0.88rem',fontWeight:700,color:'#1E3A5F'}}>All Timetables</div>
+            <span style={{fontSize:'0.72rem',color:'#6B7080'}}>{timetables.length} total</span>
+          </div>
+          <table className="dtbl">
+            <thead><tr><th>Timetable</th><th>Class</th><th>Faculty</th><th>Validity</th><th>Status</th><th>Health</th><th>Actions</th></tr></thead>
+            <tbody>
+              {timetables.map(tt=>{
+                const{issues,warnings}=validate(tt,timetables);
+                return(
+                  <tr key={tt.id}>
+                    <td><div style={{fontWeight:700,fontSize:'0.83rem'}}>{tt.name}</div><div style={{fontSize:'0.7rem',color:'#6B7080'}}>{tt.institution}</div></td>
+                    <td style={{fontSize:'0.78rem'}}>{tt.classYear}{tt.section?` · ${tt.section}`:''}</td>
+                    <td style={{fontSize:'0.75rem',color:'#6B7080'}}>{tt.faculty.length} member{tt.faculty.length!==1?'s':''}</td>
+                    <td style={{fontSize:'0.72rem',color:'#6B7080'}}>{tt.startDate&&<div>{tt.startDate}</div>}{tt.endDate&&<div>{tt.endDate}</div>}</td>
+                    <td><span className={`badge ${tt.status==='published'?'bdg-green':'bdg-amber'}`}>{tt.status}</span></td>
+                    <td>
+                      {issues.length>0&&<span className="badge bdg-red">{issues.length} err</span>}
+                      {warnings.length>0&&<span className="badge bdg-amber" style={{marginLeft:'0.2rem'}}>{warnings.length} ⚠</span>}
+                      {issues.length===0&&warnings.length===0&&<span style={{fontSize:'0.72rem',color:'#16A34A'}}>✓ OK</span>}
+                    </td>
+                    <td>
+                      <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap'}}>
+                        <button className="btn btn-primary btn-xs" onClick={()=>onOpen(tt,'builder')}>Edit</button>
+                        <button className="btn btn-outline btn-xs" onClick={()=>onOpen(tt,'student')}>Student</button>
+                        <button className="btn btn-outline btn-xs" onClick={()=>onOpen(tt,'faculty')}>Faculty</button>
+                        <button className="btn btn-outline btn-xs" onClick={()=>onDuplicate(tt)}>Copy</button>
+                        <button style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:'0.85rem'}} onClick={()=>setConfDel(tt)}>✕</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {confDel&&<Confirm title="Delete Timetable?" msg={`"${confDel.name}" will be permanently deleted.`}
+        onConfirm={()=>{onDelete(confDel.id);setConfDel(null);showToast('success','Deleted.');}}
+        onCancel={()=>setConfDel(null)} confirmTxt="Delete" danger/>}
+    </div>
+  );
+};
+
+const{useState,useEffect}=React;
+function App(){
+  useEffect(()=>{
+    const el=document.createElement('style');
+    el.textContent=CSS;
+    document.head.appendChild(el);
+    return()=>document.head.removeChild(el);
+  },[]);
+
+  const[timetables,setTimetables]=useState([]);
+  const[active,setActive]=useState(null);
+  const[view,setView]=useState('dashboard');
+  const[showWizard,setShowWizard]=useState(false);
+  const[toasts,setToasts]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[saveStatus,setSaveStatus]=useState(''); // 'saving' | 'saved' | 'error' | ''
+
+  // Load from persistent storage on mount
+  useEffect(()=>{
+    const load=()=>{
+      try{
+        const raw=localStorage.getItem('lms_timetables_v3');const result=raw?{value:raw}:null;
+        if(result&&result.value){
+          const saved=JSON.parse(result.value);
+          if(Array.isArray(saved)&&saved.length>0){
+            setTimetables(saved);
+          } else {
+            setTimetables([SAMPLE]);
+          }
+        } else {
+          setTimetables([SAMPLE]);
+        }
+      } catch(e){
+        setTimetables([SAMPLE]);
+      }
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  // Save to persistent storage whenever timetables change
+  useEffect(()=>{
+    if(loading)return;
+    const save=()=>{
+      setSaveStatus('saving');
+      try{
+        localStorage.setItem('lms_timetables_v3',JSON.stringify(timetables));
+        setSaveStatus('saved');
+        setTimeout(()=>setSaveStatus(''),2200);
+      } catch(e){
+        setSaveStatus('error');
+        setTimeout(()=>setSaveStatus(''),3000);
+      }
+    };
+    const timer=setTimeout(save,600); // debounce 600ms
+    return()=>clearTimeout(timer);
+  },[timetables,loading]);
+
+  const showToast=(type,msg)=>{const id=uid();setToasts(p=>[...p,{id,type,msg}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);};
+  const openTT=(tt,dest='builder')=>{setActive(tt);setView(dest);};
+  const updateTT=newTT=>{setActive(newTT);setTimetables(p=>p.map(t=>t.id===newTT.id?newTT:t));};
+  const createTT=tt=>{setTimetables(p=>[...p,tt]);setActive(tt);setView('builder');setShowWizard(false);showToast('success','Timetable created and saved! Click 👥 Faculty to add faculty.');};
+  const deleteTT=id=>{setTimetables(p=>p.filter(t=>t.id!==id));if(active?.id===id){setActive(null);setView('dashboard');}};
+  const dupTT=tt=>{const n={...tt,id:uid(),name:`${tt.name} (Copy)`,status:'draft',entries:tt.entries.map(e=>({...e,id:uid()})),faculty:tt.faculty.map(f=>({...f,id:uid()})),createdAt:new Date().toISOString().split('T')[0]};setTimetables(p=>[...p,n]);showToast('success','Duplicated.');};
+  const resetData=async()=>{
+    try{localStorage.removeItem('lms_timetables_v3');}catch(e){}
+    setTimetables([SAMPLE]);setActive(null);setView('dashboard');
+    showToast('success','Data reset to defaults.');
+  };
+  const navClick=id=>{
+    if((id==='builder'||id==='faculty'||id==='student')&&!active){
+      if(timetables.length>0){setActive(timetables[0]);setView(id);}else showToast('warning','Create a timetable first.');return;
+    }
+    if(id==='dashboard'){setView('dashboard');return;}setView(id);
+  };
+  const NAV=[{id:'dashboard',label:'Dashboard',icon:'📊'},{id:'builder',label:'Builder',icon:'🏗'},{id:'faculty',label:'Faculty View',icon:'👨\u200d🏫'},{id:'student',label:'Student View',icon:'👩\u200d🎓'}];
+
+  if(loading) return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#F0EEE8',flexDirection:'column',gap:'1rem'}}>
+      <div style={{fontSize:'2.5rem'}}>📚</div>
+      <div style={{fontSize:'1rem',fontWeight:600,color:'#1E3A5F'}}>Loading LMS Timetable…</div>
+      <div style={{fontSize:'0.8rem',color:'#9B9690'}}>Restoring your saved data</div>
+    </div>
+  );
+
+  return(
+    <div className="app">
+      <aside className="sidebar">
+        <div className="sb-brand">
+          <div style={{fontSize:'1.1rem',marginBottom:'0.25rem'}}>📚</div>
+          <div className="sb-title">LMS Timetable</div>
+          
+        </div>
+        <nav className="sidebar-nav">
+          <div className="nav-sec">Main</div>
+          {NAV.map(n=>(
+            <div key={n.id} className={`nav-item${view===n.id?' active':''}`} onClick={()=>navClick(n.id)}>
+              <span>{n.icon}</span>{n.label}
+            </div>
+          ))}
+          {timetables.length>0&&<>
+            <div className="nav-sec" style={{marginTop:'0.5rem'}}>Timetables</div>
+            {timetables.map(tt=>(
+              <div key={tt.id} className={`nav-item${active?.id===tt.id&&view==='builder'?' active':''}`} onClick={()=>openTT(tt,'builder')} style={{fontSize:'0.76rem',paddingLeft:'1rem'}}>
+                <span style={{width:7,height:7,borderRadius:'50%',background:tt.status==='published'?'#16A34A':'#D97706',flexShrink:0,display:'inline-block'}}/>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{tt.name}</span>
+              </div>
+            ))}
+          </>}
+        </nav>
+        <div style={{padding:'0.85rem',borderTop:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+          <button className="btn btn-amber btn-sm" style={{justifyContent:'center',width:'100%'}} onClick={()=>setShowWizard(true)}>+ New Timetable</button>
+          {/* Save status indicator */}
+          {saveStatus&&(
+            <div style={{textAlign:'center',fontSize:'0.65rem',color:saveStatus==='saved'?'#86EFAC':saveStatus==='error'?'#FCA5A5':'rgba(255,255,255,0.5)',display:'flex',alignItems:'center',justifyContent:'center',gap:'0.3rem'}}>
+              {saveStatus==='saving'&&<span className="save-dot"/>}
+              {saveStatus==='saved'&&'✓ All changes saved'}
+              {saveStatus==='saving'&&'Saving…'}
+              {saveStatus==='error'&&'⚠ Save failed'}
+            </div>
+          )}
+          <button onClick={resetData} style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.28)',fontSize:'0.63rem',textAlign:'center',padding:'0.2rem'}}>Reset to defaults</button>
+        </div>
+      </aside>
+      <main className="main">
+        {view==='dashboard'&&<Dashboard timetables={timetables} onOpen={openTT} onCreate={()=>setShowWizard(true)} onDelete={deleteTT} onDuplicate={dupTT} showToast={showToast}/>}
+        {view==='builder'&&active&&<Builder tt={active} onChange={updateTT} onBack={()=>setView('dashboard')} showToast={showToast} allTimetables={timetables}/>}
+        {view==='student'&&active&&<StudentView tt={active} onBack={()=>setView('dashboard')}/>}
+        {view==='faculty'&&active&&<FacultyView tt={active} onBack={()=>setView('dashboard')}/>}
+      </main>
+      {showWizard&&<Wizard onSave={createTT} onClose={()=>setShowWizard(false)} showToast={showToast}/>}
+      <Toast toasts={toasts}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+</script>
+</body>
+</html>
