@@ -204,61 +204,6 @@ const autoGen=tt=>{
   return{...tt,entries};
 };
 
-const SAMPLE={
-  id:'tt_001',name:'B.Sc CS — Semester 3 — Section A',academicYear:'2026-2027',
-  institution:'',department:'',
-  program:'B.Sc Computer Science',classYear:'Semester 3',section:'Section A',
-  status:'published',startDate:'2026-06-01',endDate:'2026-09-30',
-  createdAt:'2026-06-01',updatedAt:'2026-08-12',
-  workingDays:['Monday','Tuesday','Wednesday','Thursday','Friday'],
-  periods:[
-    {id:'p1',name:'Period 1',startTime:'08:30',endTime:'09:30',type:'class'},
-    {id:'p2',name:'Period 2',startTime:'09:30',endTime:'10:30',type:'class'},
-    {id:'b1',name:'Coffee Break',startTime:'10:30',endTime:'10:45',type:'coffee-break'},
-    {id:'p3',name:'Period 3',startTime:'10:45',endTime:'11:45',type:'class'},
-    {id:'p4',name:'Period 4',startTime:'11:45',endTime:'12:45',type:'class'},
-    {id:'l1',name:'Lunch Break',startTime:'12:45',endTime:'13:30',type:'meal-break'},
-    {id:'p5',name:'Period 5',startTime:'13:30',endTime:'14:30',type:'class'},
-    {id:'p6',name:'Period 6',startTime:'14:30',endTime:'15:30',type:'class'},
-  ],
-  subjects:[
-    {id:'s1',name:'Mathematics',code:'MAT101',type:'Theory',periodsPerWeek:5,color:'#2563EB',bg:'#DBEAFE',facultyId:'f1'},
-    {id:'s2',name:'Physics',code:'PHY101',type:'Theory',periodsPerWeek:4,color:'#7C3AED',bg:'#EDE9FE',facultyId:'f2'},
-    {id:'s3',name:'Computer Science',code:'CS101',type:'Practical',periodsPerWeek:6,color:'#16A34A',bg:'#DCFCE7',facultyId:'f4'},
-    {id:'s4',name:'English',code:'ENG101',type:'Theory',periodsPerWeek:3,color:'#D97706',bg:'#FEF3C7',facultyId:'f3'},
-    {id:'s5',name:'Database Mgmt',code:'DBM201',type:'Lab',periodsPerWeek:4,color:'#DB2777',bg:'#FCE7F3',facultyId:'f4'},
-  ],
-  faculty:[
-    {id:'f1',name:'Dr. Arun Kumar',employeeId:'EMP001',department:'Mathematics',email:'arun@greenfield.edu',maxPerDay:4,maxPerWeek:18},
-    {id:'f2',name:'Dr. Priya Sharma',employeeId:'EMP002',department:'Physics',email:'priya@greenfield.edu',maxPerDay:4,maxPerWeek:18},
-    {id:'f3',name:'Prof. Rahul Menon',employeeId:'EMP003',department:'English',email:'rahul@greenfield.edu',maxPerDay:4,maxPerWeek:18},
-    {id:'f4',name:'Prof. Kiran Das',employeeId:'EMP004',department:'Computer Science',email:'kiran@greenfield.edu',maxPerDay:5,maxPerWeek:22},
-  ],
-  entries:[
-    {id:'e01',day:'Monday',periodId:'p1',subjectId:'s1',facultyId:'f1'},
-    {id:'e02',day:'Monday',periodId:'p2',subjectId:'s2',facultyId:'f2'},
-    {id:'e03',day:'Monday',periodId:'p3',subjectId:'s3',facultyId:'f4'},
-    {id:'e04',day:'Monday',periodId:'p4',subjectId:'s4',facultyId:'f3'},
-    {id:'e05',day:'Monday',periodId:'p5',subjectId:'s5',facultyId:'f4'},
-    {id:'e06',day:'Tuesday',periodId:'p1',subjectId:'s2',facultyId:'f2'},
-    {id:'e07',day:'Tuesday',periodId:'p2',subjectId:'s1',facultyId:'f1'},
-    {id:'e08',day:'Tuesday',periodId:'p3',subjectId:'s4',facultyId:'f3'},
-    {id:'e09',day:'Tuesday',periodId:'p4',subjectId:'s5',facultyId:'f4'},
-    {id:'e10',day:'Tuesday',periodId:'p5',subjectId:'s3',facultyId:'f4'},
-    {id:'e11',day:'Wednesday',periodId:'p1',subjectId:'s4',facultyId:'f3'},
-    {id:'e12',day:'Wednesday',periodId:'p2',subjectId:'s3',facultyId:'f4'},
-    {id:'e13',day:'Wednesday',periodId:'p3',subjectId:'s1',facultyId:'f1'},
-    {id:'e14',day:'Wednesday',periodId:'p4',subjectId:'s2',facultyId:'f2'},
-    {id:'e15',day:'Wednesday',periodId:'p5',subjectId:'s5',facultyId:'f4'},
-    {id:'e16',day:'Thursday',periodId:'p1',subjectId:'s1',facultyId:'f1'},
-    {id:'e17',day:'Thursday',periodId:'p2',subjectId:'s3',facultyId:'f4'},
-    {id:'e18',day:'Thursday',periodId:'p3',subjectId:'s2',facultyId:'f2'},
-    {id:'e19',day:'Thursday',periodId:'p4',subjectId:'s5',facultyId:'f4'},
-    {id:'e20',day:'Friday',periodId:'p1',subjectId:'s3',facultyId:'f4'},
-    {id:'e21',day:'Friday',periodId:'p2',subjectId:'s1',facultyId:'f1'},
-    {id:'e22',day:'Friday',periodId:'p3',subjectId:'s3',facultyId:'f4'},
-  ]
-};
 
 const Toast=({toasts})=>(
   <div className="toast-wrap">
@@ -1217,13 +1162,13 @@ function App(){
           if(Array.isArray(saved)&&saved.length>0){
             setTimetables(saved);
           } else {
-            setTimetables([SAMPLE]);
+            setTimetables([]);
           }
         } else {
-          setTimetables([SAMPLE]);
+          setTimetables([]);
         }
       } catch(e){
-        setTimetables([SAMPLE]);
+        setTimetables([]);
       }
       setLoading(false);
     };
@@ -1256,7 +1201,7 @@ function App(){
   const dupTT=tt=>{const n={...tt,id:uid(),name:`${tt.name} (Copy)`,status:'draft',entries:tt.entries.map(e=>({...e,id:uid()})),faculty:tt.faculty.map(f=>({...f,id:uid()})),createdAt:new Date().toISOString().split('T')[0]};setTimetables(p=>[...p,n]);showToast('success','Duplicated.');};
   const resetData=async()=>{
     try{localStorage.removeItem('lms_timetables_v3');}catch(e){}
-    setTimetables([SAMPLE]);setActive(null);setView('dashboard');
+    setTimetables([]);setActive(null);setView('dashboard');
     showToast('success','Data reset to defaults.');
   };
   const navClick=id=>{
