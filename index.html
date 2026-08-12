@@ -7,10 +7,12 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body style="margin:0;padding:0">
 <div id="root"></div>
 <script type="text/babel">
+const{useState,useEffect}=React;
 
 const CSS = `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -645,11 +647,38 @@ const FreqPanel=({tt})=>(
   </div>
 );
 
-const Builder=({tt,onChange,onBack,showToast,allTimetables})=>{
+const Builder=({tt,onChange,onBack,onDelete,showToast,allTimetables})=>{
   const[showVal,setShowVal]=useState(false);
   const[confPub,setConfPub]=useState(false);
   const[confAuto,setConfAuto]=useState(false);
+  const[confDel,setConfDel]=useState(false);
   const[showFacMgr,setShowFacMgr]=useState(false);
+  const[downloading,setDownloading]=useState(false);
+
+  const doDownload=async(fmt='png')=>{
+    const el=document.getElementById('tt-capture');
+    if(!el){showToast('error','Could not find timetable to capture.');return;}
+    if(!window.html2canvas){showToast('warning','Image library still loading — please try again in a moment.');return;}
+    setDownloading(true);
+    showToast('warning','Generating image…');
+    try{
+      const canvas=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,allowTaint:true});
+      const link=document.createElement('a');
+      const safeName=(tt.name||'timetable').replace(/[^a-z0-9\s]/gi,'').trim().replace(/\s+/g,'_');
+      if(fmt==='jpg'){
+        link.download=`${safeName}_timetable.jpg`;
+        link.href=canvas.toDataURL('image/jpeg',0.95);
+      } else {
+        link.download=`${safeName}_timetable.png`;
+        link.href=canvas.toDataURL('image/png');
+      }
+      link.click();
+      showToast('success',`Timetable downloaded as ${fmt.toUpperCase()}!`);
+    }catch(e){
+      showToast('error','Download failed. Try using Print (Ctrl+P / Cmd+P) instead.');
+    }
+    setDownloading(false);
+  };
   const val=validate(tt,allTimetables);
   const doPub=()=>{onChange({...tt,status:tt.status==='published'?'draft':'published'});setConfPub(false);showToast('success',tt.status==='published'?'Unpublished.':'Published!');};
   const doAuto=()=>{onChange(autoGen(tt));setConfAuto(false);showToast('success','Auto-generated! Review and adjust.');};
@@ -675,10 +704,19 @@ const Builder=({tt,onChange,onBack,showToast,allTimetables})=>{
             </button>
             <button className="btn btn-outline btn-sm" onClick={()=>setConfAuto(true)}>⚡ Auto Generate</button>
             <button className="btn btn-outline btn-sm" style={{background:'#EFF6FF',color:'#1D4ED8',borderColor:'#BFDBFE'}} onClick={()=>setShowFacMgr(true)}>👥 Faculty ({tt.faculty.length})</button>
+            <div style={{position:'relative',display:'inline-block'}}>
+              <button className="btn btn-outline btn-sm" style={{background:'#F0FDF4',color:'#15803D',borderColor:'#BBF7D0',gap:'0.4rem'}} onClick={()=>doDownload('png')} disabled={downloading}>
+                {downloading?'⏳ Generating…':'📥 Download PNG'}
+              </button>
+            </div>
+            <button className="btn btn-outline btn-sm" style={{color:'#6B7080'}} onClick={()=>doDownload('jpg')} disabled={downloading}>JPG</button>
           </div>
-          <button className={`btn btn-sm ${tt.status==='published'?'btn-outline':'btn-green'}`} onClick={()=>setConfPub(true)}>
-            {tt.status==='published'?'⊘ Unpublish':'✓ Publish'}
-          </button>
+          <div style={{display:'flex',gap:'0.45rem'}}>
+            <button className={`btn btn-sm ${tt.status==='published'?'btn-outline':'btn-green'}`} onClick={()=>setConfPub(true)}>
+              {tt.status==='published'?'⊘ Unpublish':'✓ Publish'}
+            </button>
+            <button className="btn btn-red btn-sm" onClick={()=>setConfDel(true)}>🗑 Delete</button>
+          </div>
         </div>
       </div>
 
@@ -705,7 +743,36 @@ const Builder=({tt,onChange,onBack,showToast,allTimetables})=>{
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 252px',gap:'1rem',alignItems:'start'}}>
         <div>
-          <TimetableGrid tt={tt} editable={true} onChange={onChange} showToast={showToast} allTimetables={allTimetables}/>
+          {/* Capture area — this entire div becomes the downloaded image */}
+          <div id="tt-capture" style={{background:'white',padding:'1.25rem',borderRadius:'12px',border:'1px solid #E8E2D6'}}>
+            {/* Export header */}
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',borderBottom:'2px solid #1E3A5F',paddingBottom:'0.75rem',marginBottom:'0.9rem'}}>
+              <div>
+                <div style={{fontSize:'1.05rem',fontWeight:800,color:'#1E3A5F'}}>{tt.name}</div>
+                <div style={{fontSize:'0.75rem',color:'#6B7080',marginTop:'0.2rem'}}>
+                  {tt.institution&&<span>{tt.institution} · </span>}
+                  {tt.department&&<span>{tt.department}</span>}
+                  {tt.program&&<span> · {tt.program}</span>}
+                </div>
+                <div style={{fontSize:'0.7rem',color:'#9B9690',marginTop:'0.12rem'}}>
+                  {tt.classYear&&<span>{tt.classYear}</span>}
+                  {tt.section&&<span> · {tt.section}</span>}
+                  {tt.academicYear&&<span> · {tt.academicYear}</span>}
+                </div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:'0.7rem',color:'#6B7080'}}>Validity Period</div>
+                <div style={{fontSize:'0.78rem',fontWeight:600,color:'#1E3A5F'}}>{tt.startDate||'—'} – {tt.endDate||'—'}</div>
+                <span style={{display:'inline-flex',alignItems:'center',padding:'0.15rem 0.5rem',borderRadius:'20px',fontSize:'0.65rem',fontWeight:600,background:tt.status==='published'?'#DCFCE7':'#FEF3C7',color:tt.status==='published'?'#15803D':'#B45309',marginTop:'0.25rem'}}>{tt.status}</span>
+              </div>
+            </div>
+            <TimetableGrid tt={tt} editable={true} onChange={onChange} showToast={showToast} allTimetables={allTimetables}/>
+            {/* Export footer */}
+            <div style={{borderTop:'1px solid #EDE9E0',marginTop:'0.75rem',paddingTop:'0.5rem',display:'flex',justifyContent:'space-between',fontSize:'0.65rem',color:'#B0A898'}}>
+              <span>LMS Timetable Manager</span>
+              <span>Generated: {new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</span>
+            </div>
+          </div>
           <div style={{fontSize:'0.68rem',color:'#9B9690',marginTop:'0.45rem'}}>Click a cell to assign · Drag cards to rearrange · Faculty conflicts checked automatically</div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'0.85rem'}}>
@@ -750,24 +817,49 @@ const Builder=({tt,onChange,onBack,showToast,allTimetables})=>{
         onConfirm={doPub} onCancel={()=>setConfPub(false)} confirmTxt={tt.status==='published'?'Unpublish':'Publish'}/>}
       {confAuto&&<Confirm title="Auto-Generate Timetable?" msg="This replaces all current assignments. You can edit afterwards."
         onConfirm={doAuto} onCancel={()=>setConfAuto(false)} confirmTxt="Generate"/>}
+      {confDel&&<Confirm title="Delete Timetable?" msg={`"${tt.name}" will be permanently deleted. This cannot be undone.`}
+        onConfirm={()=>{onDelete(tt.id);setConfDel(false);}} onCancel={()=>setConfDel(false)} confirmTxt="Delete Timetable" danger/>}
     </div>
   );
 };
 
 const StudentView=({tt,onBack})=>{
   const today=getDOW();
+  const[downloading,setDownloading]=useState(false);
+  const doDownload=async()=>{
+    const el=document.getElementById('tt-student-capture');
+    if(!el||!window.html2canvas){return;}
+    setDownloading(true);
+    try{
+      const canvas=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+      const link=document.createElement('a');
+      link.download=`${(tt.name||'timetable').replace(/[^a-z0-9\s]/gi,'').trim().replace(/\s+/g,'_')}_timetable.png`;
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    }catch(e){}
+    setDownloading(false);
+  };
   return(
     <div>
       <button className="btn btn-outline btn-sm" style={{marginBottom:'1rem'}} onClick={onBack}>← Back</button>
-      <div style={{background:'#1E3A5F',borderRadius:'14px',padding:'1.3rem',color:'white',marginBottom:'1.1rem'}}>
-        <div style={{fontSize:'1.15rem',fontWeight:700}}>{tt.name}</div>
-        <div style={{fontSize:'0.8rem',opacity:0.68,marginTop:'0.28rem'}}>{tt.institution} · {tt.program}</div>
-        <div style={{fontSize:'0.73rem',opacity:0.5,marginTop:'0.18rem'}}>Valid: {tt.startDate} – {tt.endDate}</div>
-      </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 240px',gap:'1rem',alignItems:'start'}}>
         <div>
-          <TimetableGrid tt={tt} editable={false} onChange={()=>{}} showToast={()=>{}} allTimetables={[]}/>
-          <div style={{fontSize:'0.7rem',color:'#9B9690',marginTop:'0.4rem'}}>Today: {today}</div>
+          <div id="tt-student-capture" style={{background:'white',padding:'1.1rem',borderRadius:'12px',border:'1px solid #E8E2D6'}}>
+            <div style={{background:'#1E3A5F',borderRadius:'10px',padding:'1.1rem',color:'white',marginBottom:'0.9rem'}}>
+              <div style={{fontSize:'1.1rem',fontWeight:700}}>{tt.name}</div>
+              <div style={{fontSize:'0.78rem',opacity:0.68,marginTop:'0.25rem'}}>{tt.institution&&`${tt.institution} · `}{tt.program}</div>
+              <div style={{fontSize:'0.7rem',opacity:0.5,marginTop:'0.15rem'}}>Valid: {tt.startDate} – {tt.endDate}</div>
+            </div>
+            <TimetableGrid tt={tt} editable={false} onChange={()=>{}} showToast={()=>{}} allTimetables={[]}/>
+            <div style={{borderTop:'1px solid #EDE9E0',marginTop:'0.65rem',paddingTop:'0.45rem',display:'flex',justifyContent:'space-between',fontSize:'0.62rem',color:'#B0A898'}}>
+              <span>{tt.classYear&&`${tt.classYear}`}{tt.section&&` · ${tt.section}`}</span>
+              <span>Generated: {new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</span>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem',alignItems:'center'}}>
+            <button className="btn btn-sm" style={{background:'#F0FDF4',color:'#15803D',border:'1.5px solid #BBF7D0',fontWeight:600}} onClick={doDownload} disabled={downloading}>{downloading?'⏳ Generating…':'📥 Download PNG'}</button>
+            <div style={{fontSize:'0.68rem',color:'#9B9690'}}>Today: {today}</div>
+          </div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'0.85rem'}}>
           <TodayPanel tt={tt}/>
@@ -1062,7 +1154,7 @@ const Dashboard=({timetables,onOpen,onCreate,onDelete,onDuplicate,showToast})=>{
                         <button className="btn btn-outline btn-xs" onClick={()=>onOpen(tt,'student')}>Student</button>
                         <button className="btn btn-outline btn-xs" onClick={()=>onOpen(tt,'faculty')}>Faculty</button>
                         <button className="btn btn-outline btn-xs" onClick={()=>onDuplicate(tt)}>Copy</button>
-                        <button style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:'0.85rem'}} onClick={()=>setConfDel(tt)}>✕</button>
+                        <button className="btn btn-red btn-xs" onClick={()=>setConfDel(tt)}>🗑 Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -1079,7 +1171,6 @@ const Dashboard=({timetables,onOpen,onCreate,onDelete,onDuplicate,showToast})=>{
   );
 };
 
-const{useState,useEffect}=React;
 function App(){
   useEffect(()=>{
     const el=document.createElement('style');
@@ -1205,7 +1296,7 @@ function App(){
       </aside>
       <main className="main">
         {view==='dashboard'&&<Dashboard timetables={timetables} onOpen={openTT} onCreate={()=>setShowWizard(true)} onDelete={deleteTT} onDuplicate={dupTT} showToast={showToast}/>}
-        {view==='builder'&&active&&<Builder tt={active} onChange={updateTT} onBack={()=>setView('dashboard')} showToast={showToast} allTimetables={timetables}/>}
+        {view==='builder'&&active&&<Builder tt={active} onChange={updateTT} onBack={()=>setView('dashboard')} onDelete={id=>{deleteTT(id);setView('dashboard');}} showToast={showToast} allTimetables={timetables}/>}
         {view==='student'&&active&&<StudentView tt={active} onBack={()=>setView('dashboard')}/>}
         {view==='faculty'&&active&&<FacultyView tt={active} onBack={()=>setView('dashboard')}/>}
       </main>
