@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>LMS Timetable Manager</title>
+<script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbeddedApp.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -229,12 +230,15 @@ const Confirm=({title,msg,onConfirm,onCancel,confirmTxt='Confirm',danger=false})
   </div>
 );
 
-// Faculty Management Modal
+// Faculty Management Modal — with Zoho CRM sync
 const FacultyModal=({tt,onChange,onClose,showToast})=>{
   const empty={name:'',employeeId:'',department:'',email:'',maxPerDay:4,maxPerWeek:20};
   const[form,setForm]=useState(empty);
   const[editing,setEditing]=useState(null);
   const[confirmDel,setConfirmDel]=useState(null);
+  const[importing,setImporting]=useState(false);
+  const[zohoList,setZohoList]=useState([]);
+  const[showZohoPanel,setShowZohoPanel]=useState(false);
   const upd=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
   const startEdit=f=>{setEditing(f.id);setForm({name:f.name,employeeId:f.employeeId||'',department:f.department||'',email:f.email||'',maxPerDay:f.maxPerDay||4,maxPerWeek:f.maxPerWeek||20});};
   const cancelEdit=()=>{setEditing(null);setForm(empty);};
@@ -245,8 +249,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
       updated={...tt,faculty:tt.faculty.map(f=>f.id===editing?{...f,...form}:f)};
       setEditing(null);setForm(empty);showToast('success','Faculty updated.');
     } else {
-      const newF={id:uid(),...form};
-      updated={...tt,faculty:[...tt.faculty,newF]};
+      updated={...tt,faculty:[...tt.faculty,{id:uid(),...form}]};
       setForm(empty);showToast('success',`${form.name} added.`);
     }
     onChange(updated);
@@ -258,10 +261,62 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
     showToast('success','Faculty removed.');
   };
   const doRemove=fid=>{
-    const newEntries=tt.entries.filter(e=>e.facultyId!==fid);
-    onChange({...tt,faculty:tt.faculty.filter(f=>f.id!==fid),entries:newEntries});
+    onChange({...tt,faculty:tt.faculty.filter(f=>f.id!==fid),entries:tt.entries.filter(e=>e.facultyId!==fid)});
     setConfirmDel(null);showToast('success','Faculty and their assignments removed.');
   };
+
+  // --- Zoho CRM sync ---
+  const syncFromZoho=async()=>{
+    const zohoAvailable=typeof ZOHO!=='undefined'&&ZOHO.CRM&&ZOHO.CRM.API;
+    if(!zohoAvailable){
+      showToast('error','Zoho CRM SDK not detected. Open this widget inside Zoho CRM.');
+      return;
+    }
+    setImporting(true);
+    try{
+      const resp=await ZOHO.CRM.API.getAllRecords({
+        Entity:'CustomModule34',
+        sort_order:'asc',
+        per_page:200,
+        page:1
+      });
+      if(resp&&resp.data&&resp.data.length>0){
+        const fetched=resp.data.map(r=>({
+          id:uid(),
+          name:[r.FirstName||r.First_Name||'',r.LastName||r.Last_Name||''].filter(Boolean).join(' ').trim(),
+          email:r.Email||'',
+          employeeId:r.Employee_ID||r.CF_Employee_ID||r.Employee_Id||'',
+          department:r.Department||r.CF_Department||'',
+          maxPerDay:4,
+          maxPerWeek:20,
+          zohoId:r.id
+        })).filter(f=>f.name.trim());
+        setZohoList(fetched);
+        setShowZohoPanel(true);
+        showToast('success',`${fetched.length} faculty fetched from Zoho CRM.`);
+      } else {
+        showToast('warning','No records found in CustomModule34.');
+      }
+    }catch(e){
+      showToast('error','Sync failed: '+(e.message||'Check module permissions.'));
+    }
+    setImporting(false);
+  };
+
+  const addOne=f=>{
+    const exists=tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name);
+    if(exists){showToast('warning',`${f.name} is already in the list.`);return;}
+    onChange({...tt,faculty:[...tt.faculty,f]});
+    showToast('success',`${f.name} added.`);
+  };
+  const addAll=()=>{
+    const newF=zohoList.filter(f=>!tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name));
+    if(newF.length===0){showToast('warning','All fetched faculty are already in the list.');return;}
+    onChange({...tt,faculty:[...tt.faculty,...newF]});
+    setShowZohoPanel(false);
+    showToast('success',`${newF.length} faculty member${newF.length!==1?'s':''} added from Zoho CRM.`);
+  };
+
   const tiny={fontSize:'0.79rem',padding:'0.36rem 0.55rem'};
   return(
     <div className="overlay" onClick={onClose}>
@@ -273,37 +328,67 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.2rem',cursor:'pointer',color:'#6B7080'}}>×</button>
         </div>
-        <div className="modal-body" style={{maxHeight:'72vh',overflowY:'auto'}}>
-          {/* Add / Edit form */}
+        <div className="modal-body" style={{maxHeight:'74vh',overflowY:'auto'}}>
+
+          {/* ── Zoho CRM Sync Panel ── */}
+          <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'12px',padding:'1rem',marginBottom:'1.1rem'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.75rem',flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'0.85rem',color:'#1D4ED8'}}>🔗 Sync from Zoho CRM</div>
+                <div style={{fontSize:'0.72rem',color:'#3B82F6',marginTop:'0.15rem'}}>Pulls faculty records from <strong>CustomModule34</strong> (FirstName, LastName, Email)</div>
+              </div>
+              <button className="btn btn-sm" style={{background:'#1D4ED8',color:'white',flexShrink:0}} onClick={syncFromZoho} disabled={importing}>
+                {importing?'⏳ Fetching…':'↓ Sync Faculty'}
+              </button>
+            </div>
+
+            {showZohoPanel&&zohoList.length>0&&(
+              <div style={{marginTop:'0.85rem',borderTop:'1px solid #BFDBFE',paddingTop:'0.85rem'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'0.5rem'}}>
+                  <span style={{fontSize:'0.8rem',fontWeight:700,color:'#1D4ED8'}}>{zohoList.length} faculty found in Zoho CRM</span>
+                  <div style={{display:'flex',gap:'0.5rem'}}>
+                    <button className="btn btn-xs" style={{background:'none',color:'#6B7080',border:'1px solid #D0C8BA'}} onClick={()=>setShowZohoPanel(false)}>Hide</button>
+                    <button className="btn btn-xs btn-green" onClick={addAll}>+ Add All</button>
+                  </div>
+                </div>
+                <div style={{maxHeight:'180px',overflowY:'auto',background:'white',borderRadius:'8px',border:'1px solid #BFDBFE'}}>
+                  {zohoList.map(f=>{
+                    const exists=tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name);
+                    return(
+                      <div key={f.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0.5rem 0.75rem',borderBottom:'1px solid #DBEAFE',fontSize:'0.79rem'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.55rem',minWidth:0}}>
+                          <div className="fac-avatar" style={{width:26,height:26,fontSize:'0.62rem',flexShrink:0}}>{getInitials(f.name)}</div>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>
+                            {f.email&&<div style={{fontSize:'0.68rem',color:'#3B82F6',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.email}</div>}
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-xs"
+                          style={{flexShrink:0,background:exists?'#F0FDF4':'#1D4ED8',color:exists?'#15803D':'white',border:exists?'1px solid #BBF7D0':'none',cursor:exists?'default':'pointer'}}
+                          disabled={exists}
+                          onClick={()=>!exists&&addOne(f)}
+                        >{exists?'✓ Added':'+ Add'}</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Manual Add / Edit Form ── */}
           <div style={{background:'#F8F6F0',borderRadius:'12px',padding:'1rem',marginBottom:'1.1rem',border:'1px solid #E8E2D6'}}>
-            <div style={{fontWeight:700,fontSize:'0.83rem',color:'#1E3A5F',marginBottom:'0.75rem'}}>{editing?'✏️ Edit Faculty':'➕ Add Faculty'}</div>
+            <div style={{fontWeight:700,fontSize:'0.83rem',color:'#1E3A5F',marginBottom:'0.75rem'}}>{editing?'✏️ Edit Faculty':'➕ Add Faculty Manually'}</div>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 2fr',gap:'0.5rem',marginBottom:'0.5rem'}}>
-              <div className="fg" style={{marginBottom:0}}>
-                <label className="lbl">Full Name *</label>
-                <input className="inp" style={tiny} value={form.name} onChange={upd('name')} placeholder="e.g. Dr. Arun Kumar"/>
-              </div>
-              <div className="fg" style={{marginBottom:0}}>
-                <label className="lbl">Employee ID</label>
-                <input className="inp" style={tiny} value={form.employeeId} onChange={upd('employeeId')} placeholder="EMP001"/>
-              </div>
-              <div className="fg" style={{marginBottom:0}}>
-                <label className="lbl">Department</label>
-                <input className="inp" style={tiny} value={form.department} onChange={upd('department')} placeholder="Mathematics"/>
-              </div>
-              <div className="fg" style={{marginBottom:0}}>
-                <label className="lbl">Email</label>
-                <input type="email" className="inp" style={tiny} value={form.email} onChange={upd('email')} placeholder="name@college.edu"/>
-              </div>
+              <div className="fg" style={{marginBottom:0}}><label className="lbl">Full Name *</label><input className="inp" style={tiny} value={form.name} onChange={upd('name')} placeholder="e.g. Dr. Arun Kumar"/></div>
+              <div className="fg" style={{marginBottom:0}}><label className="lbl">Employee ID</label><input className="inp" style={tiny} value={form.employeeId} onChange={upd('employeeId')} placeholder="EMP001"/></div>
+              <div className="fg" style={{marginBottom:0}}><label className="lbl">Department</label><input className="inp" style={tiny} value={form.department} onChange={upd('department')} placeholder="Mathematics"/></div>
+              <div className="fg" style={{marginBottom:0}}><label className="lbl">Email</label><input type="email" className="inp" style={tiny} value={form.email} onChange={upd('email')} placeholder="name@college.edu"/></div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'0.5rem',marginBottom:'0.75rem'}}>
-              <div className="fg" style={{marginBottom:0}}>
-                <label className="lbl">Max Periods/Day</label>
-                <input type="number" className="inp" style={tiny} value={form.maxPerDay} min={1} max={10} onChange={e=>setForm(p=>({...p,maxPerDay:+e.target.value}))}/>
-              </div>
-              <div className="fg" style={{marginBottom:0}}>
-                <label className="lbl">Max Periods/Week</label>
-                <input type="number" className="inp" style={tiny} value={form.maxPerWeek} min={1} max={40} onChange={e=>setForm(p=>({...p,maxPerWeek:+e.target.value}))}/>
-              </div>
+              <div className="fg" style={{marginBottom:0}}><label className="lbl">Max Periods/Day</label><input type="number" className="inp" style={tiny} value={form.maxPerDay} min={1} max={10} onChange={e=>setForm(p=>({...p,maxPerDay:+e.target.value}))}/></div>
+              <div className="fg" style={{marginBottom:0}}><label className="lbl">Max Periods/Week</label><input type="number" className="inp" style={tiny} value={form.maxPerWeek} min={1} max={40} onChange={e=>setForm(p=>({...p,maxPerWeek:+e.target.value}))}/></div>
             </div>
             <div style={{display:'flex',gap:'0.5rem'}}>
               <button className="btn btn-primary btn-sm" onClick={save}>{editing?'💾 Save Changes':'➕ Add Faculty'}</button>
@@ -311,17 +396,20 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
             </div>
           </div>
 
-          {/* Faculty list */}
+          {/* ── Faculty List ── */}
           <div style={{fontWeight:700,fontSize:'0.83rem',color:'#1E3A5F',marginBottom:'0.6rem'}}>{tt.faculty.length} Faculty Member{tt.faculty.length!==1?'s':''}</div>
           {tt.faculty.length===0
-            ?<div style={{textAlign:'center',padding:'1.5rem',color:'#9B9690',fontSize:'0.83rem'}}>No faculty added yet. Use the form above to add faculty members.</div>
+            ?<div style={{textAlign:'center',padding:'1.5rem',color:'#9B9690',fontSize:'0.83rem'}}>No faculty added yet. Sync from Zoho CRM above or add manually.</div>
             :tt.faculty.map(f=>{
               const periods=tt.entries.filter(e=>e.facultyId===f.id).length;
               return(
                 <div key={f.id} className="fac-row">
                   <div className="fac-avatar">{getInitials(f.name)}</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:'0.85rem'}}>{f.name}</div>
+                    <div style={{fontWeight:700,fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'0.4rem'}}>
+                      {f.name}
+                      {f.zohoId&&<span style={{fontSize:'0.6rem',background:'#DBEAFE',color:'#1D4ED8',padding:'0.08rem 0.4rem',borderRadius:'10px',fontWeight:600}}>Zoho</span>}
+                    </div>
                     <div style={{fontSize:'0.71rem',color:'#6B7080',marginTop:'0.1rem'}}>
                       {f.department&&<span>{f.department}</span>}
                       {f.employeeId&&<span style={{marginLeft:'0.6rem',color:'#9B9690'}}>{f.employeeId}</span>}
@@ -330,7 +418,6 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                     <span className="badge bdg-blue">{periods} periods</span>
-                    <span style={{fontSize:'0.68rem',color:'#9B9690'}}>max {f.maxPerDay||'—'}/day</span>
                     <button className="btn btn-outline btn-xs" onClick={()=>startEdit(f)}>Edit</button>
                     <button className="btn btn-xs btn-red" onClick={()=>remove(f.id)}>Remove</button>
                   </div>
@@ -342,7 +429,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
           <button className="btn btn-primary btn-sm" onClick={onClose}>Done</button>
         </div>
       </div>
-      {confirmDel&&<Confirm title="Remove Faculty?" msg="This faculty member has class assignments. Removing them will also clear those assignments from the timetable." onConfirm={()=>doRemove(confirmDel)} onCancel={()=>setConfirmDel(null)} confirmTxt="Remove" danger/>}
+      {confirmDel&&<Confirm title="Remove Faculty?" msg="This faculty member has class assignments. Removing them will also clear those assignments." onConfirm={()=>doRemove(confirmDel)} onCancel={()=>setConfirmDel(null)} confirmTxt="Remove" danger/>}
     </div>
   );
 };
@@ -1151,6 +1238,14 @@ function App(){
   const[toasts,setToasts]=useState([]);
   const[loading,setLoading]=useState(true);
   const[saveStatus,setSaveStatus]=useState(''); // 'saving' | 'saved' | 'error' | ''
+
+  // Initialise Zoho CRM SDK (only active when running inside Zoho CRM)
+  useEffect(()=>{
+    if(typeof ZOHO!=='undefined'&&ZOHO.embeddedApp){
+      ZOHO.embeddedApp.on('PageLoad',function(){});
+      ZOHO.embeddedApp.init();
+    }
+  },[]);
 
   // Load from persistent storage on mount
   useEffect(()=>{
