@@ -245,9 +245,6 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
   const[form,setForm]=useState(empty);
   const[editing,setEditing]=useState(null);
   const[confirmDel,setConfirmDel]=useState(null);
-  const[importing,setImporting]=useState(false);
-  const[zohoList,setZohoList]=useState([]);
-  const[showZohoPanel,setShowZohoPanel]=useState(false);
   const upd=k=>e=>setForm(p=>({...p,[k]:e.target.value}));
   const startEdit=f=>{setEditing(f.id);setForm({name:f.name,employeeId:f.employeeId||'',department:f.department||'',email:f.email||'',maxPerDay:f.maxPerDay||4,maxPerWeek:f.maxPerWeek||20});};
   const cancelEdit=()=>{setEditing(null);setForm(empty);};
