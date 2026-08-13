@@ -4,7 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>LMS Timetable Manager</title>
-<script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbeddedApp.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -206,33 +205,14 @@ const autoGen=tt=>{
 };
 
 
-// ─── Zoho CRM SDK — robust async init ────────────────────────────────────
-let _zohoPromise = null;
-const ensureZoho = () => {
-  if (_zohoPromise) return _zohoPromise;
-  _zohoPromise = new Promise((resolve, reject) => {
-    let checks = 0;
-    const tryInit = () => {
-      const Z = typeof ZOHO !== 'undefined' ? ZOHO : null;
-      if (Z && Z.embeddedApp) {
-        // Register PageLoad handler then init
-        Z.embeddedApp.on('PageLoad', () => resolve(Z));
-        try { Z.embeddedApp.init(); } catch(e) {}
-        // Fallback: if PageLoad never fires (some Zoho Vertical setups skip it),
-        // resolve after 2 s so we can still attempt API calls
-        setTimeout(() => resolve(Z), 2000);
-      } else if (++checks < 15) {
-        // ZOHO not injected yet — retry every 400 ms (up to 6 s total)
-        setTimeout(tryInit, 400);
-      } else {
-        _zohoPromise = null;
-        reject(new Error('NOT_IN_ZOHO'));
-      }
-    };
-    tryInit();
-  });
-  return _zohoPromise;
-};
+// ─── Zoho CRM — OAuth REST API integration ───────────────────────────────
+const ZOHO_DOMAINS=[
+  {label:'Global (US)',  auth:'accounts.zoho.com',    api:'www.zohoapis.com'},
+  {label:'India',        auth:'accounts.zoho.in',     api:'www.zohoapis.in'},
+  {label:'Europe',       auth:'accounts.zoho.eu',     api:'www.zohoapis.eu'},
+  {label:'Australia',    auth:'accounts.zoho.com.au', api:'www.zohoapis.com.au'},
+  {label:'Japan',        auth:'accounts.zoho.jp',     api:'www.zohoapis.jp'},
+];
 // ─────────────────────────────────────────────────────────────────────────
 
 const Toast=({toasts})=>(
@@ -294,63 +274,83 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
     setConfirmDel(null);showToast('success','Faculty and their assignments removed.');
   };
 
-  // --- Zoho CRM sync ---
+  // ── OAuth REST API state ──
+  const[clientId,setClientId]=useState(()=>localStorage.getItem('zoho_client_id')||'');
+  const[domain,setDomain]=useState(()=>localStorage.getItem('zoho_domain')||'zoho.com');
+  const[accessToken,setAccessToken]=useState(()=>localStorage.getItem('zoho_access_token')||'');
+  const[importing,setImporting]=useState(false);
+  const[zohoList,setZohoList]=useState([]);
+  const[showZohoPanel,setShowZohoPanel]=useState(false);
+  const[showSetup,setShowSetup]=useState(false);
+
+  const connectZoho=()=>{
+    if(!clientId.trim()){showToast('error','Enter your Zoho OAuth Client ID first.');return;}
+    localStorage.setItem('zoho_client_id',clientId);
+    localStorage.setItem('zoho_domain',domain);
+    const base=window.location.href.split('#')[0].split('?')[0];
+    const scope='ZohoCRM.modules.CustomModule34.READ,ZohoCRM.modules.READ';
+    const url=`https://accounts.${domain}/oauth/v2/auth?response_type=token`+
+      `&client_id=${encodeURIComponent(clientId)}`+
+      `&scope=${encodeURIComponent(scope)}`+
+      `&redirect_uri=${encodeURIComponent(base)}`+
+      `&access_type=online`;
+    window.location.href=url; // navigates the iframe to Zoho auth, then back
+  };
+
+  const disconnect=()=>{
+    localStorage.removeItem('zoho_access_token');
+    setAccessToken('');setZohoList([]);setShowZohoPanel(false);
+    showToast('success','Disconnected from Zoho CRM.');
+  };
+
   const syncFromZoho=async()=>{
+    if(!accessToken){showToast('error','Connect to Zoho CRM first.');setShowSetup(true);return;}
     setImporting(true);
     try{
-      // Retry up to 6 s for ZOHO to appear, then 2 s timeout fallback if PageLoad never fires
-      const Z=await ensureZoho();
-      if(!Z||!Z.CRM||!Z.CRM.API||!Z.CRM.API.getAllRecords){
-        throw new Error('ZOHO.CRM.API not available — check that the widget has the CRM API scope enabled in Zoho.');
+      const apiDomain=ZOHO_DOMAINS.find(d=>d.auth===`accounts.${domain}`)?.api||'www.zohoapis.com';
+      const resp=await fetch(
+        `https://${apiDomain}/crm/v2/CustomModule34?per_page=200&fields=FirstName,LastName,Email`,
+        {headers:{'Authorization':`Zoho-oauthtoken ${accessToken}`}}
+      );
+      if(resp.status===401){
+        localStorage.removeItem('zoho_access_token');setAccessToken('');
+        showToast('error','Token expired. Click Connect again.');setShowSetup(true);
+        setImporting(false);return;
       }
-      const resp=await Z.CRM.API.getAllRecords({
-        Entity:'CustomModule34',
-        sort_order:'asc',
-        per_page:200,
-        page:1
-      });
-      if(resp&&resp.data&&resp.data.length>0){
-        const fetched=resp.data.map(r=>({
+      if(!resp.ok){
+        const txt=await resp.text();
+        throw new Error(`API ${resp.status}: ${txt.slice(0,200)}`);
+      }
+      const data=await resp.json();
+      if(data&&data.data&&data.data.length>0){
+        const fetched=data.data.map(r=>({
           id:uid(),
-          name:[r.FirstName||r.First_Name||'',r.LastName||r.Last_Name||''].filter(Boolean).join(' ').trim(),
-          email:r.Email||'',
-          employeeId:r.Employee_ID||r.CF_Employee_ID||r.Employee_Id||'',
-          department:r.Department||r.CF_Department||'',
-          maxPerDay:4,
-          maxPerWeek:20,
-          zohoId:r.id
-        })).filter(f=>f.name.trim());
-        setZohoList(fetched);
-        setShowZohoPanel(true);
+          name:[r.FirstName||'',r.LastName||''].filter(Boolean).join(' ').trim(),
+          email:r.Email||'',employeeId:'',department:'',
+          maxPerDay:4,maxPerWeek:20,zohoId:r.id
+        })).filter(f=>f.name);
+        setZohoList(fetched);setShowZohoPanel(true);
         showToast('success',`${fetched.length} faculty fetched from Zoho CRM.`);
       } else {
-        showToast('warning','No records in CustomModule34. Check the module name and your profile permissions.');
+        showToast('warning','No records returned from CustomModule34.');
       }
-    }catch(e){
-      if(e.message==='NOT_IN_ZOHO'){
-        showToast('error','Could not reach Zoho CRM after 6 s. Open this as a Webtab inside Zoho CRM — not directly in a browser.');
-      } else {
-        showToast('error','Sync error: '+(e.message||JSON.stringify(e)));
-      }
-    }
+    }catch(e){showToast('error','Sync error: '+e.message);}
     setImporting(false);
   };
 
   const addOne=f=>{
-    const exists=tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name);
-    if(exists){showToast('warning',`${f.name} is already in the list.`);return;}
-    onChange({...tt,faculty:[...tt.faculty,f]});
-    showToast('success',`${f.name} added.`);
+    if(tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name)){showToast('warning',`${f.name} already in list.`);return;}
+    onChange({...tt,faculty:[...tt.faculty,f]});showToast('success',`${f.name} added.`);
   };
   const addAll=()=>{
     const newF=zohoList.filter(f=>!tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name));
-    if(newF.length===0){showToast('warning','All fetched faculty are already in the list.');return;}
-    onChange({...tt,faculty:[...tt.faculty,...newF]});
-    setShowZohoPanel(false);
-    showToast('success',`${newF.length} faculty member${newF.length!==1?'s':''} added from Zoho CRM.`);
+    if(!newF.length){showToast('warning','All fetched faculty already in list.');return;}
+    onChange({...tt,faculty:[...tt.faculty,...newF]});setShowZohoPanel(false);
+    showToast('success',`${newF.length} faculty member${newF.length!==1?'s':''} added.`);
   };
 
   const tiny={fontSize:'0.79rem',padding:'0.36rem 0.55rem'};
+  const isConnected=!!accessToken;
   return(
     <div className="overlay" onClick={onClose}>
       <div className="modal modal-xl" onClick={e=>e.stopPropagation()}>
@@ -363,45 +363,77 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
         </div>
         <div className="modal-body" style={{maxHeight:'74vh',overflowY:'auto'}}>
 
-          {/* ── Zoho CRM Sync Panel ── */}
-          <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'12px',padding:'1rem',marginBottom:'1.1rem'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.75rem',flexWrap:'wrap'}}>
+          {/* ── Zoho CRM OAuth Sync Panel ── */}
+          <div style={{background:isConnected?'#F0FDF4':'#EFF6FF',border:`1px solid ${isConnected?'#BBF7D0':'#BFDBFE'}`,borderRadius:'12px',padding:'1rem',marginBottom:'1.1rem'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.75rem',flexWrap:'wrap',marginBottom:showSetup||!isConnected?'0.85rem':0}}>
               <div>
-                <div style={{fontWeight:700,fontSize:'0.85rem',color:'#1D4ED8'}}>🔗 Sync from Zoho CRM</div>
-                <div style={{fontSize:'0.72rem',color:'#3B82F6',marginTop:'0.15rem'}}>Pulls faculty records from <strong>CustomModule34</strong> (FirstName, LastName, Email)</div>
+                <div style={{fontWeight:700,fontSize:'0.85rem',color:isConnected?'#15803D':'#1D4ED8'}}>
+                  {isConnected?'✓ Connected to Zoho CRM':'🔗 Connect to Zoho CRM'}
+                </div>
+                <div style={{fontSize:'0.72rem',color:isConnected?'#16A34A':'#3B82F6',marginTop:'0.15rem'}}>
+                  {isConnected?`Token active · Module: CustomModule34`:'Authenticate once to sync faculty from CustomModule34'}
+                </div>
               </div>
-              <button className="btn btn-sm" style={{background:'#1D4ED8',color:'white',flexShrink:0}} onClick={syncFromZoho} disabled={importing}>
-                {importing?'⏳ Fetching…':'↓ Sync Faculty'}
-              </button>
+              <div style={{display:'flex',gap:'0.45rem',flexShrink:0,flexWrap:'wrap'}}>
+                {!isConnected&&<button className="btn btn-xs btn-outline" onClick={()=>setShowSetup(!showSetup)}>{showSetup?'Hide Setup':'⚙ Setup'}</button>}
+                {isConnected&&<button className="btn btn-sm" style={{background:importing?'#9CA3AF':'#16A34A',color:'white'}} onClick={syncFromZoho} disabled={importing}>{importing?'⏳ Fetching…':'↓ Sync Faculty'}</button>}
+                {isConnected&&<button className="btn btn-xs btn-outline" style={{color:'#DC2626',borderColor:'#FCA5A5'}} onClick={disconnect}>Disconnect</button>}
+              </div>
             </div>
 
+            {/* Setup panel — shown when not connected or setup toggled */}
+            {(!isConnected||showSetup)&&(
+              <div style={{background:'white',borderRadius:'10px',padding:'0.85rem',border:'1px solid #DBEAFE'}}>
+                <div style={{fontWeight:700,fontSize:'0.78rem',color:'#1E3A5F',marginBottom:'0.6rem'}}>OAuth Setup — do this once</div>
+
+                <div style={{fontSize:'0.72rem',color:'#6B7080',background:'#F8F6F0',borderRadius:'8px',padding:'0.6rem 0.75rem',marginBottom:'0.75rem',lineHeight:1.7}}>
+                  <strong>Step 1:</strong> Go to <strong>api-console.zoho.com</strong> → Add Client → Choose <em>Client-Side</em>{'\n'}
+                  <strong>Step 2:</strong> Set Homepage URL and Authorized Redirect URI to: <code style={{background:'#E8E2D6',padding:'0.1rem 0.3rem',borderRadius:'4px',fontSize:'0.68rem'}}>{window.location.href.split('#')[0].split('?')[0]}</code>{'\n'}
+                  <strong>Step 3:</strong> Copy the <strong>Client ID</strong> and paste below.
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',marginBottom:'0.6rem'}}>
+                  <div className="fg" style={{marginBottom:0}}>
+                    <label className="lbl">Client ID *</label>
+                    <input className="inp" style={tiny} value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="1000.XXXXXXXXXX"/>
+                  </div>
+                  <div className="fg" style={{marginBottom:0}}>
+                    <label className="lbl">Data Center</label>
+                    <select className="sel" style={tiny} value={domain} onChange={e=>setDomain(e.target.value)}>
+                      {ZOHO_DOMAINS.map(d=><option key={d.auth} value={d.auth.replace('accounts.','')}>{d.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={connectZoho} disabled={!clientId.trim()}>
+                  🔐 Connect to Zoho CRM
+                </button>
+                <div style={{fontSize:'0.68rem',color:'#9B9690',marginTop:'0.5rem'}}>Clicking Connect will redirect to Zoho login, then return here with your session.</div>
+              </div>
+            )}
+
+            {/* Results panel */}
             {showZohoPanel&&zohoList.length>0&&(
-              <div style={{marginTop:'0.85rem',borderTop:'1px solid #BFDBFE',paddingTop:'0.85rem'}}>
+              <div style={{marginTop:'0.85rem',borderTop:'1px solid #BBF7D0',paddingTop:'0.85rem'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'0.5rem'}}>
-                  <span style={{fontSize:'0.8rem',fontWeight:700,color:'#1D4ED8'}}>{zohoList.length} faculty found in Zoho CRM</span>
+                  <span style={{fontSize:'0.8rem',fontWeight:700,color:'#15803D'}}>{zohoList.length} faculty fetched</span>
                   <div style={{display:'flex',gap:'0.5rem'}}>
-                    <button className="btn btn-xs" style={{background:'none',color:'#6B7080',border:'1px solid #D0C8BA'}} onClick={()=>setShowZohoPanel(false)}>Hide</button>
+                    <button className="btn btn-xs btn-outline" onClick={()=>setShowZohoPanel(false)}>Hide</button>
                     <button className="btn btn-xs btn-green" onClick={addAll}>+ Add All</button>
                   </div>
                 </div>
-                <div style={{maxHeight:'180px',overflowY:'auto',background:'white',borderRadius:'8px',border:'1px solid #BFDBFE'}}>
+                <div style={{maxHeight:'180px',overflowY:'auto',background:'white',borderRadius:'8px',border:'1px solid #BBF7D0'}}>
                   {zohoList.map(f=>{
                     const exists=tt.faculty.some(x=>(x.email&&x.email===f.email)||x.name===f.name);
                     return(
-                      <div key={f.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0.5rem 0.75rem',borderBottom:'1px solid #DBEAFE',fontSize:'0.79rem'}}>
+                      <div key={f.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0.5rem 0.75rem',borderBottom:'1px solid #DCFCE7',fontSize:'0.79rem'}}>
                         <div style={{display:'flex',alignItems:'center',gap:'0.55rem',minWidth:0}}>
-                          <div className="fac-avatar" style={{width:26,height:26,fontSize:'0.62rem',flexShrink:0}}>{getInitials(f.name)}</div>
+                          <div className="fac-avatar" style={{width:26,height:26,fontSize:'0.62rem',flexShrink:0,background:'#16A34A'}}>{getInitials(f.name)}</div>
                           <div style={{minWidth:0}}>
-                            <div style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>
-                            {f.email&&<div style={{fontSize:'0.68rem',color:'#3B82F6',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.email}</div>}
+                            <div style={{fontWeight:700}}>{f.name}</div>
+                            {f.email&&<div style={{fontSize:'0.68rem',color:'#16A34A'}}>{f.email}</div>}
                           </div>
                         </div>
-                        <button
-                          className="btn btn-xs"
-                          style={{flexShrink:0,background:exists?'#F0FDF4':'#1D4ED8',color:exists?'#15803D':'white',border:exists?'1px solid #BBF7D0':'none',cursor:exists?'default':'pointer'}}
-                          disabled={exists}
-                          onClick={()=>!exists&&addOne(f)}
-                        >{exists?'✓ Added':'+ Add'}</button>
+                        <button className="btn btn-xs" style={{flexShrink:0,background:exists?'#F0FDF4':'#16A34A',color:exists?'#15803D':'white',cursor:exists?'default':'pointer'}} disabled={exists} onClick={()=>!exists&&addOne(f)}>{exists?'✓ Added':'+ Add'}</button>
                       </div>
                     );
                   })}
@@ -409,8 +441,6 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
               </div>
             )}
           </div>
-
-          {/* ── Manual Add / Edit Form ── */}
           <div style={{background:'#F8F6F0',borderRadius:'12px',padding:'1rem',marginBottom:'1.1rem',border:'1px solid #E8E2D6'}}>
             <div style={{fontWeight:700,fontSize:'0.83rem',color:'#1E3A5F',marginBottom:'0.75rem'}}>{editing?'✏️ Edit Faculty':'➕ Add Faculty Manually'}</div>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 2fr',gap:'0.5rem',marginBottom:'0.5rem'}}>
@@ -1272,9 +1302,21 @@ function App(){
   const[loading,setLoading]=useState(true);
   const[saveStatus,setSaveStatus]=useState(''); // 'saving' | 'saved' | 'error' | ''
 
-  // Pre-warm Zoho SDK on mount so it's ready when the user clicks Sync
+  // Detect OAuth token returned in URL hash after Zoho auth redirect
   useEffect(()=>{
-    ensureZoho().catch(()=>{}); // silently ignore if not in Zoho context
+    const hash=window.location.hash;
+    if(hash&&hash.includes('access_token=')){
+      const params={};
+      hash.substring(1).split('&').forEach(p=>{
+        const[k,...v]=p.split('=');
+        if(k)params[decodeURIComponent(k)]=decodeURIComponent(v.join('=')||'');
+      });
+      if(params.access_token){
+        localStorage.setItem('zoho_access_token',params.access_token);
+        window.history.replaceState(null,'',window.location.pathname+window.location.search);
+        setTimeout(()=>showToast('success','✓ Connected to Zoho CRM! Open Faculty Manager and click Sync Faculty.'),600);
+      }
+    }
   },[]);
 
   // Load from persistent storage on mount
