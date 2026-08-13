@@ -214,11 +214,13 @@ const autoGen=tt=>{
 
 
 // ─── Zoho Vertical — Hardcoded Config ────────────────────────────────────
-const ZV_SOLUTION   = 'classes';
-const ZV_PORTAL_ID  = '10048480432';
-const ZV_CLIENT_ID  = '1000.B9DMMEFPA4FUYGTMSHU9336ZPI0KWQ';
-const ZV_AUTH_BASE  = `https://${ZV_SOLUTION}.zohoplatform.com`;
-const ZV_API_DOMAIN = 'www.zohoapis.com';
+const ZV_SOLUTION       = 'classes';
+const ZV_PORTAL_ID      = '10048480432';
+const ZV_CLIENT_ID      = '1000.B9DMMEFPA4FUYGTMSHU9336ZPI0KWQ';
+const ZV_CLIENT_SECRET  = '4e923d1fd207a469f18d57731444d668d790a7219d';
+const ZV_AUTH_BASE      = `https://${ZV_SOLUTION}.zohoplatform.com`;
+const ZV_API_DOMAIN     = 'www.zohoapis.com';
+// Note: regenerate Client ID and Secret after go-live for security.
 // ─────────────────────────────────────────────────────────────────────────
 
 const Toast=({toasts})=>(
@@ -286,11 +288,11 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
   const connectZoho=()=>{
     const base=window.location.href.split('?')[0].split('#')[0];
     const url=ZV_AUTH_BASE+`/clientoauth/v2/${ZV_PORTAL_ID}/auth?`+
-      `response_type=token`+
+      `scope=${encodeURIComponent('ZohoCRM.settings.ALL,ZohoCRM.modules.ALL,ZohoCRM.users.ALL,ZohoCRM.org.ALL')}`+
       `&client_id=${encodeURIComponent(ZV_CLIENT_ID)}`+
-      `&scope=${encodeURIComponent('ZohoCRM.modules.custom.ALL,ZohoCRM.modules.READ')}`+
-      `&redirect_uri=${encodeURIComponent(base)}`+
-      `&access_type=online`;
+      `&response_type=code`+
+      `&access_type=offline`+
+      `&redirect_uri=${encodeURIComponent(base)}`;
     window.location.href=url;
   };
 
@@ -1281,8 +1283,45 @@ function App(){
   const[loading,setLoading]=useState(true);
   const[saveStatus,setSaveStatus]=useState(''); // 'saving' | 'saved' | 'error' | ''
 
-  // Detect OAuth token returned in URL hash after Zoho auth redirect
+  // Handle OAuth redirect — code flow (response_type=code) + implicit fallback
   useEffect(()=>{
+    // Code flow: Zoho redirects with ?code=XXX&accounts-server=XXX
+    const qp=new URLSearchParams(window.location.search);
+    const code=qp.get('code');
+    const acctServer=qp.get('accounts-server')||ZV_AUTH_BASE;
+    if(code){
+      window.history.replaceState(null,'',window.location.pathname);
+      (async()=>{
+        try{
+          const tokenUrl=`${acctServer}/clientoauth/v2/${ZV_PORTAL_ID}/token`;
+          const body=new URLSearchParams({
+            grant_type:'authorization_code',
+            client_id:ZV_CLIENT_ID,
+            client_secret:ZV_CLIENT_SECRET,
+            redirect_uri:window.location.href.split('?')[0].split('#')[0],
+            code
+          });
+          const resp=await fetch(tokenUrl,{
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body
+          });
+          const data=await resp.json();
+          if(data.access_token){
+            localStorage.setItem('zoho_access_token',data.access_token);
+            if(data.refresh_token)localStorage.setItem('zoho_refresh_token',data.refresh_token);
+            if(data.api_domain)localStorage.setItem('zoho_api_domain',data.api_domain.replace('https://',''));
+            setTimeout(()=>showToast('success','Connected to Zoho Vertical! Open Faculty Manager and click Sync Faculty.'),600);
+          } else {
+            setTimeout(()=>showToast('error','Token exchange failed: '+(data.error_description||data.error||JSON.stringify(data))),600);
+          }
+        }catch(e){
+          setTimeout(()=>showToast('error','Token exchange error — CORS may be blocking. Try allowing the redirect URI in Zoho Vertical trusted domains. Details: '+e.message),800);
+        }
+      })();
+      return;
+    }
+    // Implicit fallback: token returned directly in URL hash
     const hash=window.location.hash;
     if(hash&&hash.includes('access_token=')){
       const params={};
@@ -1293,7 +1332,7 @@ function App(){
       if(params.access_token){
         localStorage.setItem('zoho_access_token',params.access_token);
         window.history.replaceState(null,'',window.location.pathname+window.location.search);
-        setTimeout(()=>showToast('success','✓ Connected to Zoho CRM! Open Faculty Manager and click Sync Faculty.'),600);
+        setTimeout(()=>showToast('success','Connected to Zoho Vertical! Open Faculty Manager and click Sync Faculty.'),600);
       }
     }
   },[]);
