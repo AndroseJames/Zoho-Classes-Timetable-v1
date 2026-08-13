@@ -206,6 +206,28 @@ const autoGen=tt=>{
 };
 
 
+// ─── Zoho CRM SDK — async init helper ────────────────────────────────────
+// Ensures ZOHO.embeddedApp is fully initialised before any API call.
+// Calling ensureZoho() multiple times is safe — it reuses the same Promise.
+let _zohoPromise = null;
+const ensureZoho = () => {
+  if (_zohoPromise) return _zohoPromise;
+  if (typeof ZOHO === 'undefined' || !ZOHO.embeddedApp) {
+    return Promise.reject(new Error('NOT_IN_ZOHO'));
+  }
+  _zohoPromise = new Promise((resolve, reject) => {
+    try {
+      ZOHO.embeddedApp.on('PageLoad', () => resolve());
+      ZOHO.embeddedApp.init();
+    } catch(e) {
+      _zohoPromise = null;
+      reject(e);
+    }
+  });
+  return _zohoPromise;
+};
+// ─────────────────────────────────────────────────────────────────────────
+
 const Toast=({toasts})=>(
   <div className="toast-wrap">
     {toasts.map(t=>(
@@ -267,13 +289,10 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
 
   // --- Zoho CRM sync ---
   const syncFromZoho=async()=>{
-    const zohoAvailable=typeof ZOHO!=='undefined'&&ZOHO.CRM&&ZOHO.CRM.API;
-    if(!zohoAvailable){
-      showToast('error','Zoho CRM SDK not detected. Open this widget inside Zoho CRM.');
-      return;
-    }
     setImporting(true);
     try{
+      // Wait for SDK to be fully initialised — works even if clicked before PageLoad fires
+      await ensureZoho();
       const resp=await ZOHO.CRM.API.getAllRecords({
         Entity:'CustomModule34',
         sort_order:'asc',
@@ -295,10 +314,14 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
         setShowZohoPanel(true);
         showToast('success',`${fetched.length} faculty fetched from Zoho CRM.`);
       } else {
-        showToast('warning','No records found in CustomModule34.');
+        showToast('warning','No records found in CustomModule34. Check the module API name and permissions.');
       }
     }catch(e){
-      showToast('error','Sync failed: '+(e.message||'Check module permissions.'));
+      if(e.message==='NOT_IN_ZOHO'){
+        showToast('error','Zoho CRM SDK not available. Make sure this widget is running as a Zoho CRM Webtab.');
+      } else {
+        showToast('error','Sync failed: '+(e.message||'Check module permissions in Zoho CRM.'));
+      }
     }
     setImporting(false);
   };
@@ -1239,12 +1262,9 @@ function App(){
   const[loading,setLoading]=useState(true);
   const[saveStatus,setSaveStatus]=useState(''); // 'saving' | 'saved' | 'error' | ''
 
-  // Initialise Zoho CRM SDK (only active when running inside Zoho CRM)
+  // Pre-warm Zoho SDK on mount so it's ready when the user clicks Sync
   useEffect(()=>{
-    if(typeof ZOHO!=='undefined'&&ZOHO.embeddedApp){
-      ZOHO.embeddedApp.on('PageLoad',function(){});
-      ZOHO.embeddedApp.init();
-    }
+    ensureZoho().catch(()=>{}); // silently ignore if not in Zoho context
   },[]);
 
   // Load from persistent storage on mount
