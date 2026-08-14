@@ -214,11 +214,10 @@ const autoGen=tt=>{
 
 
 // ─── Zoho Vertical — Hardcoded Config ────────────────────────────────────
-const ZV_SOLUTION       = 'classes';
-const ZV_PORTAL_ID      = '10048480432';
 const ZV_CLIENT_ID      = '1000.B9DMMEFPA4FUYGTMSHU9336ZPI0KWQ';
 const ZV_CLIENT_SECRET  = '4e923d1fd207a469f18d57731444d668d790a7219d';
-const ZV_AUTH_BASE      = `https://${ZV_SOLUTION}.zohoplatform.com`;
+const ZV_AUTH_URL       = 'https://accounts.zoho.com/oauth/v2/auth';
+const ZV_TOKEN_URL      = 'https://accounts.zoho.com/oauth/v2/token';
 const ZV_API_DOMAIN     = 'www.zohoapis.com';
 // Note: regenerate Client ID and Secret after go-live for security.
 // ─────────────────────────────────────────────────────────────────────────
@@ -287,12 +286,13 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
 
   const connectZoho=()=>{
     const base=window.location.href.split('?')[0].split('#')[0];
-    const url=ZV_AUTH_BASE+`/clientoauth/v2/${ZV_PORTAL_ID}/auth?`+
-      `scope=${encodeURIComponent('ZohoCRM.settings.ALL,ZohoCRM.modules.ALL,ZohoCRM.users.ALL,ZohoCRM.org.ALL')}`+
-      `&client_id=${encodeURIComponent(ZV_CLIENT_ID)}`+
-      `&response_type=code`+
-      `&access_type=offline`+
-      `&redirect_uri=${encodeURIComponent(base)}`;
+    // Using accounts.zoho.com — confirmed working with Zoho Vertical
+    const url=ZV_AUTH_URL+
+      '?scope='+encodeURIComponent('ZohoVertical.users.ALL,ZohoCRM.modules.ALL,ZohoCRM.settings.ALL')+
+      '&client_id='+encodeURIComponent(ZV_CLIENT_ID)+
+      '&response_type=code'+
+      '&access_type=offline'+
+      '&redirect_uri='+encodeURIComponent(base);
     window.location.href=url;
   };
 
@@ -1288,12 +1288,15 @@ function App(){
     // Code flow: Zoho redirects with ?code=XXX&accounts-server=XXX
     const qp=new URLSearchParams(window.location.search);
     const code=qp.get('code');
-    const acctServer=qp.get('accounts-server')||ZV_AUTH_BASE;
+    const acctServer=qp.get('accounts-server')||'https://accounts.zoho.com';
     if(code){
       window.history.replaceState(null,'',window.location.pathname);
       (async()=>{
         try{
-          const tokenUrl=`${acctServer}/clientoauth/v2/${ZV_PORTAL_ID}/token`;
+          // Use standard Zoho token URL (accounts-server from redirect as fallback)
+          const tokenUrl=acctServer&&acctServer!==ZV_AUTH_URL.replace('/oauth/v2/auth','')
+            ?`${acctServer}/oauth/v2/token`
+            :ZV_TOKEN_URL;
           const body=new URLSearchParams({
             grant_type:'authorization_code',
             client_id:ZV_CLIENT_ID,
