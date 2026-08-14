@@ -218,7 +218,7 @@ const ZV_CLIENT_ID      = '1000.9JEX8NAKMZKZAENP7DMOTR1S8PHBZV';
 const ZV_CLIENT_SECRET  = 'b6658b689769e48ba1981fb2795d45ef9dda98309b';
 const ZV_AUTH_URL       = 'https://accounts.zoho.com/oauth/v2/auth';
 const ZV_TOKEN_URL      = 'https://accounts.zoho.com/oauth/v2/token';
-const ZV_API_DOMAIN     = 'www.zohoapis.com';
+const ZV_API_DOMAIN     = 'zohoverticalapis.com';
 // Note: regenerate Client ID and Secret after go-live for security.
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -307,7 +307,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
     setImporting(true);
     try{
       const resp=await fetch(
-        `https://${ZV_API_DOMAIN}/crm/v2/ZUsers?per_page=200&fields=FirstName,LastName,Email`,
+        `https://${ZV_API_DOMAIN}/crm/v6/ZUsers?fields=FirstName,Email&converted=true&per_page=200`,
         {headers:{'Authorization':`Zoho-oauthtoken ${accessToken}`}}
       );
       if(resp.status===401){
@@ -323,7 +323,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
       if(data&&data.data&&data.data.length>0){
         const fetched=data.data.map(r=>({
           id:uid(),
-          name:[r.FirstName||'',r.LastName||''].filter(Boolean).join(' ').trim(),
+          name:(r.FirstName||'').trim(),
           email:r.Email||'',employeeId:'',department:'',
           maxPerDay:4,maxPerWeek:20,zohoId:r.id
         })).filter(f=>f.name);
