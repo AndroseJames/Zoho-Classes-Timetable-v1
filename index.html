@@ -288,7 +288,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
     const base=window.location.href.split('?')[0].split('#')[0];
     // Exact URL format confirmed working with Zoho Vertical
     const url=ZV_AUTH_URL+
-      '?scope='+encodeURIComponent('ZohoVertical.users.ALL')+
+      '?scope='+encodeURIComponent('ZohoVertical.users.ALL,ZohoCRM.modules.ALL')+
       '&client_id='+encodeURIComponent(ZV_CLIENT_ID)+
       '&response_type=token'+
       '&access_type=online'+
