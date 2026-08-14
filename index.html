@@ -307,7 +307,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
     setImporting(true);
     try{
       const resp=await fetch(
-        `https://${ZV_API_DOMAIN}/crm/v2/CustomModule34?per_page=200&fields=FirstName,LastName,Email`,
+        `https://${ZV_API_DOMAIN}/crm/v2/ZUsers?per_page=200&fields=FirstName,LastName,Email`,
         {headers:{'Authorization':`Zoho-oauthtoken ${accessToken}`}}
       );
       if(resp.status===401){
@@ -330,7 +330,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
         setZohoList(fetched);setShowZohoPanel(true);
         showToast('success',`${fetched.length} faculty fetched from Zoho Vertical.`);
       } else {
-        showToast('warning','No records returned from CustomModule34.');
+        showToast('warning','No records returned from ZUsers.');
       }
     }catch(e){showToast('error','Sync error: '+e.message);}
     setImporting(false);
@@ -370,7 +370,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
                 </div>
                 <div style={{fontSize:'0.72rem',color:isConnected?'#16A34A':'#3B82F6',marginTop:'0.15rem'}}>
                   {isConnected
-                    ?'Pulling faculty from CustomModule34'
+                    ?'Pulling faculty from ZUsers'
                     :'Click to authenticate and import faculty from Zoho Vertical'}
                 </div>
               </div>
