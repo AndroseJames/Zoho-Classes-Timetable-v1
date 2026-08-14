@@ -214,8 +214,8 @@ const autoGen=tt=>{
 
 
 // ─── Zoho Vertical — Hardcoded Config ────────────────────────────────────
-const ZV_CLIENT_ID      = '1000.B9DMMEFPA4FUYGTMSHU9336ZPI0KWQ';
-const ZV_CLIENT_SECRET  = '4e923d1fd207a469f18d57731444d668d790a7219d';
+const ZV_CLIENT_ID      = '1000.9JEX8NAKMZKZAENP7DMOTR1S8PHBZV';
+const ZV_CLIENT_SECRET  = 'b6658b689769e48ba1981fb2795d45ef9dda98309b';
 const ZV_AUTH_URL       = 'https://accounts.zoho.com/oauth/v2/auth';
 const ZV_TOKEN_URL      = 'https://accounts.zoho.com/oauth/v2/token';
 const ZV_API_DOMAIN     = 'www.zohoapis.com';
@@ -290,7 +290,7 @@ const FacultyModal=({tt,onChange,onClose,showToast})=>{
     const url=ZV_AUTH_URL+
       '?scope='+encodeURIComponent('ZohoVertical.users.ALL')+
       '&client_id='+encodeURIComponent(ZV_CLIENT_ID)+
-      '&response_type=code'+
+      '&response_type=token'+
       '&access_type=online'+
       '&redirect_uri='+encodeURIComponent(base);
     window.location.href=url;
